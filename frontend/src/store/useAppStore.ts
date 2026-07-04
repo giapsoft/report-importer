@@ -42,7 +42,8 @@ interface AppState {
   /** Luôn chọn cột (dùng khi chạm ô trong bảng). */
   selectColumnIndex: (index: number) => void;
   /** Ô dữ liệu: chỉ chọn 1 dòng. */
-  toggleRowSingle: (index: number) => void;
+  /** Ô dữ liệu: chọn 1 dòng. Cùng dòng khác cột thì giữ selected. */
+  toggleRowSingle: (rowIndex: number, columnIndex: number) => void;
   /** Ô STT: chọn dải giữa 2 mốc (như Shift). */
   toggleRowRange: (index: number) => void;
   /** Header STT: chọn / bỏ chọn tất cả dòng. */
@@ -211,46 +212,51 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   selectColumnIndex: (index) => set({ selectedColumnIndex: index }),
 
-  toggleRowSingle: (index) => {
-    const { selectedRowIndexes } = get();
-    if (selectedRowIndexes.includes(index) && selectedRowIndexes.length === 1) {
+  toggleRowSingle: (rowIndex, columnIndex) => {
+    const { selectedRowIndexes, selectedColumnIndex } = get();
+    // Trạng thái trước khi chạm (cơ sở so sánh)
+    const previousRowIndexes = selectedRowIndexes;
+    const previousColumnIndex = selectedColumnIndex;
+
+    // Cùng 1 row, đổi cột → giữ nguyên selectedRowIndexes
+    if (
+      previousRowIndexes.length === 1 &&
+      previousRowIndexes.includes(rowIndex) &&
+      previousColumnIndex !== columnIndex
+    ) {
+      set({ startShiftRowIndex: -1 });
+      return;
+    }
+
+    // Chọn qua ô dữ liệu (không phải STT) → xóa điểm neo
+    if (previousRowIndexes.includes(rowIndex) && previousRowIndexes.length === 1) {
       set({ selectedRowIndexes: [], startShiftRowIndex: -1 });
     } else {
       set({
-        startShiftRowIndex: index,
-        selectedRowIndexes: [index],
+        startShiftRowIndex: -1,
+        selectedRowIndexes: [rowIndex],
       });
     }
   },
 
   toggleRowRange: (index) => {
-    const { selectedRowIndexes, startShiftRowIndex } = get();
+    const { startShiftRowIndex } = get();
 
-    if (
-      selectedRowIndexes.length === 0 ||
-      startShiftRowIndex < 0 ||
-      index === startShiftRowIndex
-    ) {
-      if (selectedRowIndexes.includes(index)) {
-        set({
-          selectedRowIndexes: selectedRowIndexes.filter((i) => i !== index),
-          startShiftRowIndex:
-            startShiftRowIndex === index ? -1 : startShiftRowIndex,
-        });
-      } else {
-        set({
-          startShiftRowIndex: index,
-          selectedRowIndexes: [...selectedRowIndexes, index],
-        });
-      }
+    // Điểm neo chỉ set khi đang -1 và user chạm STT
+    if (startShiftRowIndex < 0) {
+      set({
+        startShiftRowIndex: index,
+        selectedRowIndexes: [index],
+      });
       return;
     }
 
+    // Giữ nguyên neo; chọn dải liên tiếp từ neo đến dòng vừa chạm
     const from = Math.min(index, startShiftRowIndex);
     const to = Math.max(index, startShiftRowIndex);
-    const next = new Set(selectedRowIndexes);
-    for (let i = from; i <= to; i++) next.add(i);
-    set({ selectedRowIndexes: [...next].sort((a, b) => a - b) });
+    const indexes: number[] = [];
+    for (let i = from; i <= to; i++) indexes.push(i);
+    set({ selectedRowIndexes: indexes });
   },
 
   toggleSelectAllRows: (rowCount) => {
@@ -265,7 +271,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       return;
     }
     const indexes = Array.from({ length: rowCount }, (_, i) => i);
-    set({ selectedRowIndexes: indexes, startShiftRowIndex: 0 });
+    // Chọn tất cả không phải chạm STT → không đặt neo
+    set({ selectedRowIndexes: indexes, startShiftRowIndex: -1 });
   },
 
   clearRowSelection: () =>
@@ -274,9 +281,24 @@ export const useAppStore = create<AppState>((set, get) => ({
   insertRow: (reportId) => {
     get().updateReport(reportId, (r) => {
       const selected = get().selectedRowIndexes;
+      // Chèn ngay dưới dòng được chọn (hoặc cuối danh sách)
       const insertAt =
         selected.length > 0 ? Math.max(...selected) + 1 : r.rows.length;
-      const row = createEmptyRow(r.columns);
+      // Nhân bản dòng ngay phía trên vị trí chèn
+      const source = insertAt > 0 ? r.rows[insertAt - 1] : null;
+      const row = source
+        ? {
+            values: source.values.map((cell) =>
+              cell.kind === "Date"
+                ? { kind: "Date" as const, value: cell.value }
+                : {
+                    kind: "FlexNumber" as const,
+                    originalValue: cell.originalValue,
+                    multiplier: cell.multiplier,
+                  },
+            ),
+          }
+        : createEmptyRow(r.columns);
       const rows = [...r.rows];
       rows.splice(insertAt, 0, row);
       return { ...r, rows };

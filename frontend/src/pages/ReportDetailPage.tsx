@@ -5,8 +5,8 @@ import {
   CalendarPlus,
   CalendarMinus,
   CalendarRange,
+  CopyPlus,
   Pencil,
-  Rows3,
   Trash2,
   Upload,
   FileSpreadsheet,
@@ -244,7 +244,7 @@ export function ReportDetailPage() {
                     colSpan={report.columns.length + 1}
                     style={{ textAlign: "center", color: "var(--muted)" }}
                   >
-                    Chưa có dòng. Dùng Chèn dòng hoặc Nhập hàng loạt.
+                    Chưa có dòng. Dùng Nhân bản dòng hoặc Nhập hàng loạt.
                   </td>
                 </tr>
               ) : (
@@ -269,7 +269,7 @@ export function ReportDetailPage() {
                             selectedColumnIndex === colIndex ? "col-selected" : ""
                           }
                           onClick={() => {
-                            toggleRowSingle(rowIndex);
+                            toggleRowSingle(rowIndex, colIndex);
                             selectColumnIndex(colIndex);
                           }}
                         >
@@ -502,7 +502,7 @@ function ActionIcon({ action }: { action: DetailAction }) {
   const size = 18;
   switch (action) {
     case "insertRow":
-      return <Rows3 size={size} />;
+      return <CopyPlus size={size} />;
     case "deleteRows":
       return <Trash2 size={size} />;
     case "exportExcel":

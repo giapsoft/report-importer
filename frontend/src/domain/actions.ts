@@ -26,17 +26,17 @@ export function availableActions(
   }
 
   if (column.type === "Date") {
-    list.push("increaseDate", "decreaseDate", "setDate");
+    list.push("decreaseDate", "setDate", "increaseDate");
   }
   if (column.type === "FlexNumber") {
-    list.push("addZero", "removeZero", "updateOriginalValue");
+    list.push("removeZero", "updateOriginalValue", "addZero");
   }
 
   return list;
 }
 
 export const ACTION_LABELS: Record<DetailAction, string> = {
-  insertRow: "Chèn dòng",
+  insertRow: "Nhân bản dòng",
   deleteRows: "Xóa dòng",
   exportExcel: "Export Excel",
   increaseDate: "Ngày +1",
