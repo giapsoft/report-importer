@@ -1,0 +1,401 @@
+import { create } from "zustand";
+import { api } from "@/api/client";
+import {
+  createBatchRows,
+  createEmptyRow,
+  getMetaString,
+  mapSelectedDateCells,
+  mapSelectedFlexCells,
+  bumpDate,
+  maxDateInFirstDateColumn,
+  maxDateInSelectedRows,
+  newReportId,
+} from "@/domain/report";
+import type {
+  Report,
+  ReportColumn,
+  ReportRow,
+  RowSelectionMode,
+} from "@/domain/types";
+import { nextSelectionMode } from "@/domain/actions";
+import { todayIso } from "@/domain/format";
+
+interface AppState {
+  ready: boolean;
+  loadError: string | null;
+  splitter: string;
+  reports: Report[];
+  selectedReportIds: string[];
+
+  // detail selection (per session, not persisted)
+  selectedColumnIndex: number;
+  rowSelectionMode: RowSelectionMode;
+  startShiftRowIndex: number;
+  selectedRowIndexes: number[];
+
+  hydrate: () => Promise<void>;
+  setSplitter: (splitter: string) => void;
+  createReport: (name: string, columns: ReportColumn[], primaryColumnIndex: number) => void;
+  deleteSelectedReports: () => void;
+  toggleReportSelection: (id: string) => void;
+  clearReportSelection: () => void;
+  renameReport: (id: string, name: string) => void;
+  updateReport: (id: string, updater: (r: Report) => Report) => void;
+  getReport: (id: string) => Report | undefined;
+
+  // detail controller
+  resetDetailSelection: () => void;
+  toggleSelectedColumnIndex: (index: number) => void;
+  /** Luôn chọn cột (dùng khi chạm ô trong bảng). */
+  selectColumnIndex: (index: number) => void;
+  toggleShift: () => void;
+  toggleRow: (index: number) => void;
+  clearRowSelection: () => void;
+  insertRow: (reportId: string) => void;
+  deleteSelectedRows: (reportId: string) => void;
+  addZero: (reportId: string) => void;
+  removeZero: (reportId: string) => void;
+  updateOriginalValue: (reportId: string, originalValue: number) => void;
+  increaseDate: (reportId: string) => void;
+  decreaseDate: (reportId: string) => void;
+  setDate: (reportId: string, date: string) => void;
+  applyBatch: (
+    reportId: string,
+    numbers: number[],
+    date: string | null,
+  ) => void;
+  getMaxSelectedDate: (reportId: string) => string | null;
+  getBatchDefaultDate: (reportId: string) => string | null;
+}
+
+const persistTimers = new Map<string, ReturnType<typeof setTimeout>>();
+const pendingReports = new Map<string, Report>();
+let settingsTimer: ReturnType<typeof setTimeout> | null = null;
+
+function scheduleReportPersist(report: Report) {
+  pendingReports.set(report.id, report);
+  const existing = persistTimers.get(report.id);
+  if (existing) clearTimeout(existing);
+  persistTimers.set(
+    report.id,
+    setTimeout(() => {
+      const payload = pendingReports.get(report.id);
+      persistTimers.delete(report.id);
+      pendingReports.delete(report.id);
+      if (!payload) return;
+      api.putReport(payload).catch((err) => {
+        console.error("Lưu báo cáo thất bại", err);
+      });
+    }, 250),
+  );
+}
+
+function scheduleSettingsPersist(splitter: string) {
+  if (settingsTimer) clearTimeout(settingsTimer);
+  settingsTimer = setTimeout(() => {
+    api.putSettings(splitter).catch((err) => {
+      console.error("Lưu splitter thất bại", err);
+    });
+  }, 250);
+}
+
+function sortReports(reports: Report[]): Report[] {
+  return [...reports].sort((a, b) =>
+    (b.updatedAt ?? "").localeCompare(a.updatedAt ?? ""),
+  );
+}
+
+export const useAppStore = create<AppState>((set, get) => ({
+  ready: false,
+  loadError: null,
+  splitter: "hết",
+  reports: [],
+  selectedReportIds: [],
+  selectedColumnIndex: -1,
+  rowSelectionMode: "single",
+  startShiftRowIndex: -1,
+  selectedRowIndexes: [],
+
+  hydrate: async () => {
+    try {
+      const [settings, reports] = await Promise.all([
+        api.getSettings(),
+        api.listReports(),
+      ]);
+      set({
+        ready: true,
+        loadError: null,
+        splitter: settings.splitter || "hết",
+        reports: sortReports(reports),
+      });
+    } catch (e) {
+      set({
+        ready: true,
+        loadError: e instanceof Error ? e.message : "Không tải được dữ liệu",
+      });
+    }
+  },
+
+  setSplitter: (splitter) => {
+    set({ splitter });
+    scheduleSettingsPersist(splitter);
+  },
+
+  createReport: (name, columns, primaryColumnIndex) => {
+    const report: Report = {
+      id: newReportId(),
+      name: name.trim(),
+      columns,
+      primaryColumnIndex,
+      rows: [],
+      updatedAt: new Date().toISOString(),
+    };
+    set((s) => ({ reports: [report, ...s.reports] }));
+    scheduleReportPersist(report);
+  },
+
+  deleteSelectedReports: () => {
+    const ids = get().selectedReportIds;
+    if (ids.length === 0) return;
+    set((s) => ({
+      reports: s.reports.filter((r) => !ids.includes(r.id)),
+      selectedReportIds: [],
+    }));
+    api.deleteReports(ids).catch((err) => {
+      console.error("Xóa báo cáo thất bại", err);
+    });
+  },
+
+  toggleReportSelection: (id) => {
+    set((s) => ({
+      selectedReportIds: s.selectedReportIds.includes(id)
+        ? s.selectedReportIds.filter((x) => x !== id)
+        : [...s.selectedReportIds, id],
+    }));
+  },
+
+  clearReportSelection: () => set({ selectedReportIds: [] }),
+
+  renameReport: (id, name) => {
+    get().updateReport(id, (r) => ({ ...r, name: name.trim() }));
+  },
+
+  updateReport: (id, updater) => {
+    set((s) => {
+      const reports = s.reports.map((r) => {
+        if (r.id !== id) return r;
+        const next = {
+          ...updater(r),
+          updatedAt: new Date().toISOString(),
+        };
+        scheduleReportPersist(next);
+        return next;
+      });
+      return { reports: sortReports(reports) };
+    });
+  },
+
+  getReport: (id) => get().reports.find((r) => r.id === id),
+
+  resetDetailSelection: () =>
+    set({
+      selectedColumnIndex: -1,
+      rowSelectionMode: "single",
+      startShiftRowIndex: -1,
+      selectedRowIndexes: [],
+    }),
+
+  toggleSelectedColumnIndex: (index) => {
+    set((s) => ({
+      selectedColumnIndex:
+        s.selectedColumnIndex === index ? -1 : index,
+    }));
+  },
+
+  selectColumnIndex: (index) => set({ selectedColumnIndex: index }),
+
+  toggleShift: () =>
+    set((s) => ({ rowSelectionMode: nextSelectionMode(s.rowSelectionMode) })),
+
+  toggleRow: (index) => {
+    const s = get();
+    const { rowSelectionMode, selectedRowIndexes, startShiftRowIndex } = s;
+
+    // Chỉ chọn 1 dòng: chọn dòng mới thì bỏ dòng cũ; chạm lại để bỏ chọn.
+    if (rowSelectionMode === "single") {
+      if (selectedRowIndexes.includes(index) && selectedRowIndexes.length === 1) {
+        set({ selectedRowIndexes: [], startShiftRowIndex: -1 });
+      } else {
+        set({
+          startShiftRowIndex: index,
+          selectedRowIndexes: [index],
+        });
+      }
+      return;
+    }
+
+    // Chọn nhiều (multi) hoặc bước đầu của chọn dải (range)
+    if (
+      rowSelectionMode === "multi" ||
+      selectedRowIndexes.length === 0 ||
+      startShiftRowIndex < 0 ||
+      index === startShiftRowIndex
+    ) {
+      if (selectedRowIndexes.includes(index)) {
+        set({
+          selectedRowIndexes: selectedRowIndexes.filter((i) => i !== index),
+          startShiftRowIndex:
+            startShiftRowIndex === index ? -1 : startShiftRowIndex,
+        });
+      } else {
+        set({
+          startShiftRowIndex: index,
+          selectedRowIndexes: [...selectedRowIndexes, index],
+        });
+      }
+      return;
+    }
+
+    // range: chọn toàn bộ dòng từ mốc đến dòng vừa chạm
+    const from = Math.min(index, startShiftRowIndex);
+    const to = Math.max(index, startShiftRowIndex);
+    const next = new Set(selectedRowIndexes);
+    for (let i = from; i <= to; i++) next.add(i);
+    set({ selectedRowIndexes: [...next].sort((a, b) => a - b) });
+  },
+
+  clearRowSelection: () =>
+    set({ selectedRowIndexes: [], startShiftRowIndex: -1 }),
+
+  insertRow: (reportId) => {
+    get().updateReport(reportId, (r) => {
+      const selected = get().selectedRowIndexes;
+      const insertAt =
+        selected.length > 0 ? Math.max(...selected) + 1 : r.rows.length;
+      const row = createEmptyRow(r.columns);
+      const rows = [...r.rows];
+      rows.splice(insertAt, 0, row);
+      return { ...r, rows };
+    });
+    // giữ selection, cập nhật index sau khi chèn
+    set((s) => {
+      const insertAt =
+        s.selectedRowIndexes.length > 0
+          ? Math.max(...s.selectedRowIndexes) + 1
+          : -1;
+      if (insertAt < 0) return s;
+      return {
+        selectedRowIndexes: s.selectedRowIndexes.map((i) =>
+          i >= insertAt ? i + 1 : i,
+        ),
+      };
+    });
+  },
+
+  deleteSelectedRows: (reportId) => {
+    const selected = new Set(get().selectedRowIndexes);
+    if (selected.size === 0) return;
+    get().updateReport(reportId, (r) => ({
+      ...r,
+      rows: r.rows.filter((_, i) => !selected.has(i)),
+    }));
+    set({ selectedRowIndexes: [], startShiftRowIndex: -1 });
+  },
+
+  addZero: (reportId) => {
+    const { selectedColumnIndex, selectedRowIndexes } = get();
+    get().updateReport(reportId, (r) => ({
+      ...r,
+      rows: mapSelectedFlexCells(r, selectedRowIndexes, selectedColumnIndex, (c) => ({
+        ...c,
+        multiplier: c.multiplier * 10,
+      })),
+    }));
+  },
+
+  removeZero: (reportId) => {
+    const { selectedColumnIndex, selectedRowIndexes } = get();
+    get().updateReport(reportId, (r) => ({
+      ...r,
+      rows: mapSelectedFlexCells(r, selectedRowIndexes, selectedColumnIndex, (c) => ({
+        ...c,
+        multiplier: Math.max(1, Math.trunc(c.multiplier / 10)),
+      })),
+    }));
+  },
+
+  updateOriginalValue: (reportId, originalValue) => {
+    const { selectedColumnIndex, selectedRowIndexes } = get();
+    get().updateReport(reportId, (r) => ({
+      ...r,
+      rows: mapSelectedFlexCells(r, selectedRowIndexes, selectedColumnIndex, () => ({
+        kind: "FlexNumber",
+        originalValue,
+        multiplier: 1,
+      })),
+    }));
+  },
+
+  increaseDate: (reportId) => {
+    const { selectedColumnIndex, selectedRowIndexes } = get();
+    get().updateReport(reportId, (r) => ({
+      ...r,
+      rows: mapSelectedDateCells(r, selectedRowIndexes, selectedColumnIndex, (c) =>
+        bumpDate(c, 1),
+      ),
+    }));
+  },
+
+  decreaseDate: (reportId) => {
+    const { selectedColumnIndex, selectedRowIndexes } = get();
+    get().updateReport(reportId, (r) => ({
+      ...r,
+      rows: mapSelectedDateCells(r, selectedRowIndexes, selectedColumnIndex, (c) =>
+        bumpDate(c, -1),
+      ),
+    }));
+  },
+
+  setDate: (reportId, date) => {
+    const { selectedColumnIndex, selectedRowIndexes } = get();
+    get().updateReport(reportId, (r) => ({
+      ...r,
+      rows: mapSelectedDateCells(r, selectedRowIndexes, selectedColumnIndex, () => ({
+        kind: "Date",
+        value: date,
+      })),
+    }));
+  },
+
+  applyBatch: (reportId, numbers, date) => {
+    const { selectedColumnIndex } = get();
+    if (selectedColumnIndex < 0 || numbers.length === 0) return;
+    get().updateReport(reportId, (r) => {
+      const newRows = createBatchRows(r, selectedColumnIndex, numbers, date);
+      return { ...r, rows: [...r.rows, ...newRows] };
+    });
+  },
+
+  getMaxSelectedDate: (reportId) => {
+    const report = get().getReport(reportId);
+    if (!report) return null;
+    const { selectedColumnIndex, selectedRowIndexes } = get();
+    return (
+      maxDateInSelectedRows(report, selectedRowIndexes, selectedColumnIndex) ??
+      todayIso()
+    );
+  },
+
+  getBatchDefaultDate: (reportId) => {
+    const report = get().getReport(reportId);
+    if (!report) return null;
+    if (!report.columns.some((c) => c.type === "Date")) return null;
+    return maxDateInFirstDateColumn(report);
+  },
+}));
+
+export function reportMeta(report: Report): string {
+  return getMetaString(report);
+}
+
+export type { Report, ReportColumn, ReportRow };
