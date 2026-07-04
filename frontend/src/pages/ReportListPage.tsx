@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, Trash2 } from "lucide-react";
+import { FileSpreadsheet, Plus, Trash2 } from "lucide-react";
 import { AddReportDialog } from "@/components/AddReportDialog";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { ExportReportDialog } from "@/components/ExportReportDialog";
+import type { Report } from "@/domain/types";
 import { reportMeta, useAppStore } from "@/store/useAppStore";
 
 export function ReportListPage() {
@@ -15,6 +17,7 @@ export function ReportListPage() {
 
   const [showAdd, setShowAdd] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [exportReport, setExportReport] = useState<Report | null>(null);
 
   return (
     <div className="app-shell">
@@ -68,6 +71,18 @@ export function ReportListPage() {
                   <p className="title">{report.name}</p>
                   <p className="subtitle">{reportMeta(report) || "—"}</p>
                 </button>
+                <button
+                  type="button"
+                  className="icon-btn list-item-action"
+                  aria-label={`Export Excel ${report.name}`}
+                  title="Export Excel"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setExportReport(report);
+                  }}
+                >
+                  <FileSpreadsheet size={18} />
+                </button>
               </div>
             ))}
           </div>
@@ -94,6 +109,13 @@ export function ReportListPage() {
             deleteSelectedReports();
             setShowDeleteConfirm(false);
           }}
+        />
+      )}
+
+      {exportReport && (
+        <ExportReportDialog
+          report={exportReport}
+          onClose={() => setExportReport(null)}
         />
       )}
     </div>

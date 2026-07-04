@@ -1,25 +1,7 @@
-import type { DetailAction, Report, RowSelectionMode } from "./types";
-
-export const SELECTION_MODE_ORDER: RowSelectionMode[] = [
-  "single",
-  "multi",
-  "range",
-];
-
-export const SELECTION_MODE_LABELS: Record<RowSelectionMode, string> = {
-  single: "Chọn một",
-  multi: "Chọn nhiều",
-  range: "Chọn dải",
-};
-
-export function nextSelectionMode(mode: RowSelectionMode): RowSelectionMode {
-  const i = SELECTION_MODE_ORDER.indexOf(mode);
-  return SELECTION_MODE_ORDER[(i + 1) % SELECTION_MODE_ORDER.length];
-}
+import type { DetailAction, Report } from "./types";
 
 /** Các action cố định trên hàng header (cùng nút sửa tên). */
 export const HEADER_DETAIL_ACTIONS: DetailAction[] = [
-  "toggleShift",
   "deleteRows",
   "exportExcel",
 ];
@@ -54,7 +36,6 @@ export function availableActions(
 }
 
 export const ACTION_LABELS: Record<DetailAction, string> = {
-  toggleShift: "Chế độ chọn dòng",
   insertRow: "Chèn dòng",
   deleteRows: "Xóa dòng",
   exportExcel: "Export Excel",

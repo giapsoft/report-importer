@@ -55,11 +55,13 @@ button {
 
 .app-shell {
   min-height: 100dvh;
+  height: 100dvh;
   display: flex;
   flex-direction: column;
   max-width: 720px;
   margin: 0 auto;
   background: var(--bg);
+  overflow: hidden;
 }
 
 .page-header {
@@ -96,6 +98,18 @@ button {
   min-width: 0;
 }
 
+.header-title-btn {
+  text-align: left;
+  padding: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+}
+
+.header-title-btn:active {
+  background: rgba(255, 255, 255, 0.08);
+}
+
 .header-actions {
   display: flex;
   align-items: center;
@@ -118,6 +132,8 @@ button {
   background: rgba(255, 255, 255, 0.08);
   color: #fff;
   flex-shrink: 0;
+  touch-action: manipulation;
+  user-select: none;
 }
 
 .icon-btn:active {
@@ -128,39 +144,83 @@ button {
   background: var(--primary);
 }
 
-/* Chế độ chọn dòng: single (mặc định) → multi → range */
-.icon-btn.mode-single {
-  background: rgba(255, 255, 255, 0.08);
-}
-
-.icon-btn.mode-multi {
-  background: rgba(245, 158, 11, 0.85);
-}
-
-.icon-btn.mode-range {
-  background: var(--primary);
-}
-
 .icon-btn.danger {
   background: rgba(220, 38, 38, 0.25);
 }
 
 .actions-row {
   display: flex;
+  align-items: center;
   gap: 6px;
+}
+
+.actions-row-left {
+  display: flex;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
   overflow-x: auto;
-  padding-top: 10px;
   scrollbar-width: none;
 }
 
-.actions-row::-webkit-scrollbar {
+.actions-row-left::-webkit-scrollbar {
   display: none;
+}
+
+.actions-row-right {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.icon-btn.action-batch {
+  background: #16a34a;
+  color: #fff;
+}
+
+/* Thêm / bớt số 0 (multiplier ×10 / ÷10) */
+.zero-ctrl-icon {
+  font-size: 0.82rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+.icon-btn.action-batch:active {
+  background: #15803d;
 }
 
 .page-body {
   flex: 1;
+  min-height: 0;
   padding: 12px;
   padding-bottom: calc(12px + env(safe-area-inset-bottom));
+  overflow: auto;
+}
+
+.page-body-fill {
+  display: flex;
+  flex-direction: column;
+  padding: 8px 12px;
+  padding-bottom: 8px;
+  overflow: hidden;
+}
+
+.page-body-fill .table-wrap {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+}
+
+.page-footer {
+  flex-shrink: 0;
+  background: var(--header);
+  color: #fff;
+  padding: 10px 12px;
+  padding-bottom: calc(10px + env(safe-area-inset-bottom));
+  box-shadow: 0 -6px 20px rgba(15, 23, 42, 0.12);
 }
 
 .list {
@@ -196,6 +256,16 @@ button {
   font-size: 0.92rem;
 }
 
+.icon-btn.list-item-action {
+  background: #e2e8f0;
+  color: #0f172a;
+  flex-shrink: 0;
+}
+
+.icon-btn.list-item-action:active {
+  background: #cbd5e1;
+}
+
 .checkbox {
   width: 22px;
   height: 22px;
@@ -213,8 +283,22 @@ button {
   border: 1px solid var(--border);
   border-radius: 12px;
   overflow: auto;
-  max-height: calc(100dvh - 170px);
   box-shadow: var(--shadow);
+}
+
+.report-table td,
+.report-table thead th:first-child {
+  cursor: pointer;
+  user-select: none;
+}
+
+.report-table thead th.stt-all-selected {
+  background: #bae6fd;
+  color: #0f172a;
+}
+
+.report-table td.stt-cell {
+  font-weight: 600;
 }
 
 .report-table {
@@ -273,7 +357,7 @@ button {
 }
 
 .report-table th.col-selected .col-header-sum {
-  color: #1d4ed8;
+  color: #64748b;
 }
 
 .report-table thead th:first-child {
@@ -281,23 +365,23 @@ button {
   background: #cbd5e1;
 }
 
-/* Cột đang chọn: nổi bật cả header lẫn toàn bộ ô trong cột */
+/* Cột đang chọn: highlight nhẹ cả cột */
 .report-table th.col-selected,
 .report-table td.col-selected {
-  background: #93c5fd;
-  color: #1e3a8a;
-  box-shadow: inset 3px 0 0 #2563eb, inset -3px 0 0 #2563eb;
-  font-weight: 600;
+  background: #e0f2fe;
+  color: inherit;
+  box-shadow: inset 2px 0 0 #7dd3fc, inset -2px 0 0 #7dd3fc;
+  font-weight: inherit;
 }
 
 .report-table thead th.col-selected {
-  background: #3b82f6;
-  color: #fff;
-  box-shadow: inset 3px 0 0 #1d4ed8, inset -3px 0 0 #1d4ed8;
+  background: #bae6fd;
+  color: #0f172a;
+  box-shadow: inset 2px 0 0 #38bdf8, inset -2px 0 0 #38bdf8;
 }
 
 .report-table thead th.col-selected .col-header-sum {
-  color: #dbeafe;
+  color: #475569;
 }
 
 .report-table th.col-primary {
@@ -306,8 +390,8 @@ button {
 
 .report-table th.col-primary.col-selected {
   box-shadow:
-    inset 3px 0 0 #1d4ed8,
-    inset -3px 0 0 #1d4ed8,
+    inset 2px 0 0 #38bdf8,
+    inset -2px 0 0 #38bdf8,
     inset 0 -3px 0 var(--primary-col);
 }
 
@@ -319,10 +403,10 @@ button {
   background: #93c5fd;
 }
 
-/* Giao điểm row + cột chọn: vẫn ưu tiên nổi cột */
+/* Giao điểm row + cột chọn */
 .report-table tr.row-selected td.col-selected {
-  background: #60a5fa;
-  color: #1e3a8a;
+  background: #bfdbfe;
+  color: inherit;
 }
 
 .overlay {
@@ -384,6 +468,17 @@ button {
   gap: 8px;
   justify-content: flex-end;
   margin-top: 8px;
+}
+
+.dialog-actions-spread {
+  justify-content: space-between;
+  align-items: center;
+}
+
+.dialog-actions-end {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
 }
 
 .btn {

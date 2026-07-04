@@ -5,12 +5,6 @@ import {
   CalendarPlus,
   CalendarMinus,
   CalendarRange,
-  BetweenHorizontalStart,
-  CheckSquare,
-  CircleDot,
-  Hash,
-  Plus,
-  Minus,
   Pencil,
   Rows3,
   Trash2,
@@ -21,17 +15,26 @@ import {
   availableActions,
   ACTION_LABELS,
   HEADER_DETAIL_ACTIONS,
-  SELECTION_MODE_LABELS,
 } from "@/domain/actions";
 import { getColumnSumDisplay, getRowDisplayString } from "@/domain/report";
-import type { DetailAction, RowSelectionMode } from "@/domain/types";
+import type { DetailAction } from "@/domain/types";
+
+const HOLD_REPEAT_ACTIONS = new Set<DetailAction>([
+  "increaseDate",
+  "decreaseDate",
+  "addZero",
+  "removeZero",
+]);
 import { ConfirmBatchDialog } from "@/components/ConfirmBatchDialog";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { DateStepper } from "@/components/DateStepper";
 import { Dialog } from "@/components/Dialog";
 import { ExportReportDialog } from "@/components/ExportReportDialog";
+import { HoldIconButton } from "@/components/HoldIconButton";
 import { InputBatchDialog } from "@/components/InputBatchDialog";
 import { reportMeta, useAppStore } from "@/store/useAppStore";
 import { todayIso } from "@/domain/format";
+import { formSubmit } from "@/utils/enterSubmit";
 
 export function ReportDetailPage() {
   const { id = "" } = useParams();
@@ -40,13 +43,13 @@ export function ReportDetailPage() {
   const splitter = useAppStore((s) => s.splitter);
   const selectedColumnIndex = useAppStore((s) => s.selectedColumnIndex);
   const selectedRowIndexes = useAppStore((s) => s.selectedRowIndexes);
-  const rowSelectionMode = useAppStore((s) => s.rowSelectionMode);
 
   const resetDetailSelection = useAppStore((s) => s.resetDetailSelection);
   const toggleSelectedColumnIndex = useAppStore((s) => s.toggleSelectedColumnIndex);
   const selectColumnIndex = useAppStore((s) => s.selectColumnIndex);
-  const toggleRow = useAppStore((s) => s.toggleRow);
-  const toggleShift = useAppStore((s) => s.toggleShift);
+  const toggleRowSingle = useAppStore((s) => s.toggleRowSingle);
+  const toggleRowRange = useAppStore((s) => s.toggleRowRange);
+  const toggleSelectAllRows = useAppStore((s) => s.toggleSelectAllRows);
   const setSplitter = useAppStore((s) => s.setSplitter);
   const renameReport = useAppStore((s) => s.renameReport);
   const insertRow = useAppStore((s) => s.insertRow);
@@ -107,9 +110,6 @@ export function ReportDetailPage() {
 
   const runAction = (action: DetailAction) => {
     switch (action) {
-      case "toggleShift":
-        toggleShift();
-        break;
       case "insertRow":
         insertRow(report.id);
         break;
@@ -157,80 +157,59 @@ export function ReportDetailPage() {
           >
             <ArrowLeft size={20} />
           </button>
-          <div className="left">
+          <button
+            type="button"
+            className="left header-title-btn"
+            aria-label="Sửa báo cáo"
+            title="Sửa báo cáo"
+            onClick={() => {
+              setEditName(report.name);
+              setEditSplitter(splitter);
+              setEditOpen(true);
+            }}
+          >
             <h1>{report.name}</h1>
             <div className="meta">{reportMeta(report) || "—"}</div>
-          </div>
+          </button>
           <div className="header-actions">
             {HEADER_DETAIL_ACTIONS.map((action) => {
-              const label =
-                action === "toggleShift"
-                  ? SELECTION_MODE_LABELS[rowSelectionMode]
-                  : ACTION_LABELS[action];
-              const modeClass =
-                action === "toggleShift" ? `mode-${rowSelectionMode}` : "";
               const disabled =
                 action === "deleteRows" && selectedRowIndexes.length === 0;
               return (
                 <button
                   key={action}
                   type="button"
-                  className={`icon-btn ${modeClass} ${action === "deleteRows" ? "danger" : ""}`}
-                  aria-label={label}
-                  title={label}
+                  className={`icon-btn ${action === "deleteRows" ? "danger" : ""}`}
+                  aria-label={ACTION_LABELS[action]}
+                  title={ACTION_LABELS[action]}
                   disabled={disabled}
                   onClick={() => runAction(action)}
                 >
-                  <ActionIcon
-                    action={action}
-                    rowSelectionMode={rowSelectionMode}
-                  />
+                  <ActionIcon action={action} />
                 </button>
               );
             })}
-            <button
-              type="button"
-              className="icon-btn"
-              aria-label="Sửa báo cáo"
-              title="Sửa báo cáo"
-              onClick={() => {
-                setEditName(report.name);
-                setEditSplitter(splitter);
-                setEditOpen(true);
-              }}
-            >
-              <Pencil size={18} />
-            </button>
           </div>
         </div>
-
-        {actions.length > 0 && (
-          <div className="actions-row">
-            {actions.map((action) => (
-              <button
-                key={action}
-                type="button"
-                className="icon-btn"
-                aria-label={ACTION_LABELS[action]}
-                title={ACTION_LABELS[action]}
-                onClick={() => runAction(action)}
-              >
-                <ActionIcon
-                  action={action}
-                  rowSelectionMode={rowSelectionMode}
-                />
-              </button>
-            ))}
-          </div>
-        )}
       </header>
 
-      <main className="page-body" style={{ paddingTop: 8 }}>
+      <main className="page-body page-body-fill">
         <div className="table-wrap">
           <table className="report-table">
             <thead>
               <tr>
-                <th>STT</th>
+                <th
+                  className={
+                    report.rows.length > 0 &&
+                    selectedRowIndexes.length === report.rows.length
+                      ? "stt-all-selected"
+                      : ""
+                  }
+                  onClick={() => toggleSelectAllRows(report.rows.length)}
+                  title="Chọn / bỏ chọn tất cả"
+                >
+                  STT
+                </th>
                 {report.columns.map((col, index) => {
                   const sumText =
                     col.type === "FlexNumber" || col.type === "SummaryColumn"
@@ -276,7 +255,13 @@ export function ReportDetailPage() {
                       key={rowIndex}
                       className={selected ? "row-selected" : ""}
                     >
-                      <td onClick={() => toggleRow(rowIndex)}>{rowIndex + 1}</td>
+                      <td
+                        className="stt-cell"
+                        onClick={() => toggleRowRange(rowIndex)}
+                        title="Chọn dải dòng"
+                      >
+                        {rowIndex + 1}
+                      </td>
                       {report.columns.map((_, colIndex) => (
                         <td
                           key={colIndex}
@@ -284,7 +269,7 @@ export function ReportDetailPage() {
                             selectedColumnIndex === colIndex ? "col-selected" : ""
                           }
                           onClick={() => {
-                            toggleRow(rowIndex);
+                            toggleRowSingle(rowIndex);
                             selectColumnIndex(colIndex);
                           }}
                         >
@@ -300,105 +285,166 @@ export function ReportDetailPage() {
         </div>
       </main>
 
+      <footer className="page-footer">
+        <div className="actions-row">
+          <div className="actions-row-left">
+            {actions
+              .filter(
+                (action) => action !== "inputBatch" && action !== "insertRow",
+              )
+              .map((action) =>
+                HOLD_REPEAT_ACTIONS.has(action) ? (
+                  <HoldIconButton
+                    key={action}
+                    label={ACTION_LABELS[action]}
+                    onAction={() => runAction(action)}
+                  >
+                    <ActionIcon action={action} />
+                  </HoldIconButton>
+                ) : (
+                  <button
+                    key={action}
+                    type="button"
+                    className="icon-btn"
+                    aria-label={ACTION_LABELS[action]}
+                    title={ACTION_LABELS[action]}
+                    onClick={() => runAction(action)}
+                  >
+                    <ActionIcon action={action} />
+                  </button>
+                ),
+              )}
+          </div>
+          <div className="actions-row-right">
+            {actions.includes("insertRow") && (
+              <button
+                type="button"
+                className="icon-btn"
+                aria-label={ACTION_LABELS.insertRow}
+                title={ACTION_LABELS.insertRow}
+                onClick={() => runAction("insertRow")}
+              >
+                <ActionIcon action="insertRow" />
+              </button>
+            )}
+            {actions.includes("inputBatch") && (
+              <button
+                type="button"
+                className="icon-btn action-batch"
+                aria-label={ACTION_LABELS.inputBatch}
+                title={ACTION_LABELS.inputBatch}
+                onClick={() => runAction("inputBatch")}
+              >
+                <ActionIcon action="inputBatch" />
+              </button>
+            )}
+          </div>
+        </div>
+      </footer>
+
       {editOpen && (
         <Dialog title="Sửa báo cáo">
-          <div className="field">
-            <label htmlFor="edit-report-name">Tên báo cáo</label>
-            <input
-              id="edit-report-name"
-              value={editName}
-              onChange={(e) => setEditName(e.target.value)}
-              autoFocus
-            />
-          </div>
-          <div className="field">
-            <label htmlFor="edit-splitter">Splitter</label>
-            <input
-              id="edit-splitter"
-              value={editSplitter}
-              onChange={(e) => setEditSplitter(e.target.value)}
-              placeholder="hết"
-            />
-          </div>
-          <div className="dialog-actions">
-            <button type="button" className="btn" onClick={() => setEditOpen(false)}>
-              Hủy
-            </button>
-            <button
-              type="button"
-              className="btn primary"
-              onClick={() => {
+          <form
+            onSubmit={(e) =>
+              formSubmit(e, () => {
                 if (!editName.trim() || !editSplitter.trim()) return;
                 renameReport(report.id, editName.trim());
                 setSplitter(editSplitter.trim());
                 setEditOpen(false);
-              }}
-            >
-              Lưu
-            </button>
-          </div>
+              })
+            }
+          >
+            <div className="field">
+              <label htmlFor="edit-report-name">Tên báo cáo</label>
+              <input
+                id="edit-report-name"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                enterKeyHint="done"
+                autoFocus
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="edit-splitter">Splitter</label>
+              <input
+                id="edit-splitter"
+                value={editSplitter}
+                onChange={(e) => setEditSplitter(e.target.value)}
+                placeholder="hết"
+                enterKeyHint="done"
+              />
+            </div>
+            <div className="dialog-actions">
+              <button type="button" className="btn" onClick={() => setEditOpen(false)}>
+                Hủy
+              </button>
+              <button type="submit" className="btn primary">
+                Lưu
+              </button>
+            </div>
+          </form>
         </Dialog>
       )}
 
       {numberOpen && (
         <Dialog title="Cập nhật số gốc">
-          <p className="hint">Multiplier sẽ được đặt về 1.</p>
-          <div className="field">
-            <label>Giá trị gốc</label>
-            <input
-              inputMode="numeric"
-              value={numberValue}
-              onChange={(e) => setNumberValue(e.target.value)}
-              autoFocus
-            />
-          </div>
-          <div className="dialog-actions">
-            <button type="button" className="btn" onClick={() => setNumberOpen(false)}>
-              Hủy
-            </button>
-            <button
-              type="button"
-              className="btn primary"
-              onClick={() => {
+          <form
+            onSubmit={(e) =>
+              formSubmit(e, () => {
                 const n = Number(numberValue.replace(/\./g, ""));
                 if (!Number.isFinite(n)) return;
                 updateOriginalValue(report.id, Math.trunc(n));
                 setNumberOpen(false);
-              }}
-            >
-              Áp dụng
-            </button>
-          </div>
+              })
+            }
+          >
+            <p className="hint">Multiplier sẽ được đặt về 1.</p>
+            <div className="field">
+              <label>Giá trị gốc</label>
+              <input
+                inputMode="numeric"
+                enterKeyHint="done"
+                value={numberValue}
+                onChange={(e) => setNumberValue(e.target.value)}
+                autoFocus
+              />
+            </div>
+            <div className="dialog-actions">
+              <button type="button" className="btn" onClick={() => setNumberOpen(false)}>
+                Hủy
+              </button>
+              <button type="submit" className="btn primary">
+                Áp dụng
+              </button>
+            </div>
+          </form>
         </Dialog>
       )}
 
       {dateOpen && (
         <Dialog title="Đặt ngày">
-          <div className="field">
-            <label>Ngày</label>
-            <input
-              type="date"
-              value={dateValue}
-              onChange={(e) => setDateValue(e.target.value)}
-              autoFocus
-            />
-          </div>
-          <div className="dialog-actions">
-            <button type="button" className="btn" onClick={() => setDateOpen(false)}>
-              Hủy
-            </button>
-            <button
-              type="button"
-              className="btn primary"
-              onClick={() => {
+          <form
+            onSubmit={(e) =>
+              formSubmit(e, () => {
                 if (!dateValue) return;
                 setDate(report.id, dateValue);
                 setDateOpen(false);
-              }}
-            >
-              Áp dụng
-            </button>
-          </div>
+              })
+            }
+          >
+            <div className="field">
+              <label>Ngày</label>
+              <DateStepper value={dateValue} onChange={setDateValue} />
+            </div>
+            <div className="dialog-actions">
+              <button type="button" className="btn" onClick={() => setDateOpen(false)}>
+                Hủy
+              </button>
+              <button type="submit" className="btn primary">
+                Áp dụng
+              </button>
+            </div>
+          </form>
         </Dialog>
       )}
 
@@ -431,9 +477,12 @@ export function ReportDetailPage() {
           initialNumbers={batchConfirm}
           initialDate={getBatchDefaultDate(report.id)}
           hasDateColumn={report.columns.some((c) => c.type === "Date")}
+          insertAfterRowIndex={
+            selectedRowIndexes.length === 1 ? selectedRowIndexes[0] : null
+          }
           onCancel={() => setBatchConfirm(null)}
-          onConfirm={(numbers, date) => {
-            applyBatch(report.id, numbers, date);
+          onConfirm={(numbers, date, insertAfter) => {
+            applyBatch(report.id, numbers, date, insertAfter);
             setBatchConfirm(null);
           }}
         />
@@ -449,19 +498,9 @@ export function ReportDetailPage() {
   );
 }
 
-function ActionIcon({
-  action,
-  rowSelectionMode,
-}: {
-  action: DetailAction;
-  rowSelectionMode: RowSelectionMode;
-}) {
+function ActionIcon({ action }: { action: DetailAction }) {
   const size = 18;
   switch (action) {
-    case "toggleShift":
-      if (rowSelectionMode === "single") return <CircleDot size={size} />;
-      if (rowSelectionMode === "multi") return <CheckSquare size={size} />;
-      return <BetweenHorizontalStart size={size} />;
     case "insertRow":
       return <Rows3 size={size} />;
     case "deleteRows":
@@ -475,11 +514,11 @@ function ActionIcon({
     case "setDate":
       return <CalendarRange size={size} />;
     case "addZero":
-      return <Plus size={size} />;
+      return <span className="zero-ctrl-icon">0+</span>;
     case "removeZero":
-      return <Minus size={size} />;
+      return <span className="zero-ctrl-icon">0−</span>;
     case "updateOriginalValue":
-      return <Hash size={size} />;
+      return <Pencil size={size} />;
     case "inputBatch":
       return <Upload size={size} />;
   }

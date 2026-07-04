@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import type { ReportColumn, ReportColumnType } from "@/domain/types";
 import { DEFAULT_COLUMNS } from "@/domain/report";
+import { enterToSubmit } from "@/utils/enterSubmit";
 import { Dialog } from "./Dialog";
 
 interface AddReportDialogProps {
@@ -182,7 +183,9 @@ export function AddReportDialog({ onCancel, onCreate }: AddReportDialogProps) {
           id="report-name"
           value={name}
           onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => enterToSubmit(e, submit)}
           placeholder="Ví dụ: Chi tiêu tháng 7"
+          enterKeyHint="done"
           autoFocus
         />
       </div>
@@ -250,6 +253,8 @@ export function AddReportDialog({ onCancel, onCreate }: AddReportDialogProps) {
             <input
               value={newColName}
               onChange={(e) => setNewColName(e.target.value)}
+              onKeyDown={(e) => enterToSubmit(e, addColumn)}
+              enterKeyHint="done"
             />
           </div>
           <div className="field">

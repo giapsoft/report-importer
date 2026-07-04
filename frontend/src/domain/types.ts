@@ -39,11 +39,7 @@ export interface ConfirmBatchResult {
   numbers: number[];
 }
 
-/** Chế độ chọn dòng trên bảng chi tiết. */
-export type RowSelectionMode = "single" | "multi" | "range";
-
 export type DetailAction =
-  | "toggleShift"
   | "insertRow"
   | "deleteRows"
   | "exportExcel"

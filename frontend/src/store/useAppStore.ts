@@ -11,13 +11,7 @@ import {
   maxDateInSelectedRows,
   newReportId,
 } from "@/domain/report";
-import type {
-  Report,
-  ReportColumn,
-  ReportRow,
-  RowSelectionMode,
-} from "@/domain/types";
-import { nextSelectionMode } from "@/domain/actions";
+import type { Report, ReportColumn, ReportRow } from "@/domain/types";
 import { todayIso } from "@/domain/format";
 
 interface AppState {
@@ -29,7 +23,6 @@ interface AppState {
 
   // detail selection (per session, not persisted)
   selectedColumnIndex: number;
-  rowSelectionMode: RowSelectionMode;
   startShiftRowIndex: number;
   selectedRowIndexes: number[];
 
@@ -48,8 +41,12 @@ interface AppState {
   toggleSelectedColumnIndex: (index: number) => void;
   /** Luôn chọn cột (dùng khi chạm ô trong bảng). */
   selectColumnIndex: (index: number) => void;
-  toggleShift: () => void;
-  toggleRow: (index: number) => void;
+  /** Ô dữ liệu: chỉ chọn 1 dòng. */
+  toggleRowSingle: (index: number) => void;
+  /** Ô STT: chọn dải giữa 2 mốc (như Shift). */
+  toggleRowRange: (index: number) => void;
+  /** Header STT: chọn / bỏ chọn tất cả dòng. */
+  toggleSelectAllRows: (rowCount: number) => void;
   clearRowSelection: () => void;
   insertRow: (reportId: string) => void;
   deleteSelectedRows: (reportId: string) => void;
@@ -63,6 +60,8 @@ interface AppState {
     reportId: string,
     numbers: number[],
     date: string | null,
+    /** Chèn ngay dưới dòng này; bỏ trống = thêm cuối danh sách. */
+    insertAfterRowIndex?: number | null,
   ) => void;
   getMaxSelectedDate: (reportId: string) => string | null;
   getBatchDefaultDate: (reportId: string) => string | null;
@@ -112,7 +111,6 @@ export const useAppStore = create<AppState>((set, get) => ({
   reports: [],
   selectedReportIds: [],
   selectedColumnIndex: -1,
-  rowSelectionMode: "single",
   startShiftRowIndex: -1,
   selectedRowIndexes: [],
 
@@ -200,7 +198,6 @@ export const useAppStore = create<AppState>((set, get) => ({
   resetDetailSelection: () =>
     set({
       selectedColumnIndex: -1,
-      rowSelectionMode: "single",
       startShiftRowIndex: -1,
       selectedRowIndexes: [],
     }),
@@ -214,29 +211,22 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   selectColumnIndex: (index) => set({ selectedColumnIndex: index }),
 
-  toggleShift: () =>
-    set((s) => ({ rowSelectionMode: nextSelectionMode(s.rowSelectionMode) })),
-
-  toggleRow: (index) => {
-    const s = get();
-    const { rowSelectionMode, selectedRowIndexes, startShiftRowIndex } = s;
-
-    // Chỉ chọn 1 dòng: chọn dòng mới thì bỏ dòng cũ; chạm lại để bỏ chọn.
-    if (rowSelectionMode === "single") {
-      if (selectedRowIndexes.includes(index) && selectedRowIndexes.length === 1) {
-        set({ selectedRowIndexes: [], startShiftRowIndex: -1 });
-      } else {
-        set({
-          startShiftRowIndex: index,
-          selectedRowIndexes: [index],
-        });
-      }
-      return;
+  toggleRowSingle: (index) => {
+    const { selectedRowIndexes } = get();
+    if (selectedRowIndexes.includes(index) && selectedRowIndexes.length === 1) {
+      set({ selectedRowIndexes: [], startShiftRowIndex: -1 });
+    } else {
+      set({
+        startShiftRowIndex: index,
+        selectedRowIndexes: [index],
+      });
     }
+  },
 
-    // Chọn nhiều (multi) hoặc bước đầu của chọn dải (range)
+  toggleRowRange: (index) => {
+    const { selectedRowIndexes, startShiftRowIndex } = get();
+
     if (
-      rowSelectionMode === "multi" ||
       selectedRowIndexes.length === 0 ||
       startShiftRowIndex < 0 ||
       index === startShiftRowIndex
@@ -256,12 +246,26 @@ export const useAppStore = create<AppState>((set, get) => ({
       return;
     }
 
-    // range: chọn toàn bộ dòng từ mốc đến dòng vừa chạm
     const from = Math.min(index, startShiftRowIndex);
     const to = Math.max(index, startShiftRowIndex);
     const next = new Set(selectedRowIndexes);
     for (let i = from; i <= to; i++) next.add(i);
     set({ selectedRowIndexes: [...next].sort((a, b) => a - b) });
+  },
+
+  toggleSelectAllRows: (rowCount) => {
+    if (rowCount <= 0) {
+      set({ selectedRowIndexes: [], startShiftRowIndex: -1 });
+      return;
+    }
+    const { selectedRowIndexes } = get();
+    const allSelected = selectedRowIndexes.length === rowCount;
+    if (allSelected) {
+      set({ selectedRowIndexes: [], startShiftRowIndex: -1 });
+      return;
+    }
+    const indexes = Array.from({ length: rowCount }, (_, i) => i);
+    set({ selectedRowIndexes: indexes, startShiftRowIndex: 0 });
   },
 
   clearRowSelection: () =>
@@ -317,10 +321,23 @@ export const useAppStore = create<AppState>((set, get) => ({
     const { selectedColumnIndex, selectedRowIndexes } = get();
     get().updateReport(reportId, (r) => ({
       ...r,
-      rows: mapSelectedFlexCells(r, selectedRowIndexes, selectedColumnIndex, (c) => ({
-        ...c,
-        multiplier: Math.max(1, Math.trunc(c.multiplier / 10)),
-      })),
+      rows: mapSelectedFlexCells(r, selectedRowIndexes, selectedColumnIndex, (c) => {
+        if (c.multiplier > 1) {
+          return {
+            ...c,
+            multiplier: Math.max(1, Math.trunc(c.multiplier / 10)),
+          };
+        }
+        // multiplier đã = 1: chia originalValue cho 10 nếu chia hết
+        if (c.originalValue % 10 === 0) {
+          return {
+            ...c,
+            originalValue: Math.trunc(c.originalValue / 10),
+            multiplier: 1,
+          };
+        }
+        return c;
+      }),
     }));
   },
 
@@ -367,12 +384,21 @@ export const useAppStore = create<AppState>((set, get) => ({
     }));
   },
 
-  applyBatch: (reportId, numbers, date) => {
+  applyBatch: (reportId, numbers, date, insertAfterRowIndex = null) => {
     const { selectedColumnIndex } = get();
     if (selectedColumnIndex < 0 || numbers.length === 0) return;
     get().updateReport(reportId, (r) => {
       const newRows = createBatchRows(r, selectedColumnIndex, numbers, date);
-      return { ...r, rows: [...r.rows, ...newRows] };
+      if (
+        insertAfterRowIndex == null ||
+        insertAfterRowIndex < 0 ||
+        insertAfterRowIndex >= r.rows.length
+      ) {
+        return { ...r, rows: [...r.rows, ...newRows] };
+      }
+      const rows = [...r.rows];
+      rows.splice(insertAfterRowIndex + 1, 0, ...newRows);
+      return { ...r, rows };
     });
   },
 
