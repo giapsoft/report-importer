@@ -23,6 +23,8 @@ import type { DetailAction } from "@/domain/types";
 const HOLD_REPEAT_ACTIONS = new Set<DetailAction>([
   "increaseDate",
   "decreaseDate",
+  "increaseDateBelow",
+  "decreaseDateBelow",
   "addZero",
   "removeZero",
 ]);
@@ -64,6 +66,8 @@ export function ReportDetailPage() {
   const updateOriginalValue = useAppStore((s) => s.updateOriginalValue);
   const increaseDate = useAppStore((s) => s.increaseDate);
   const decreaseDate = useAppStore((s) => s.decreaseDate);
+  const increaseDateBelow = useAppStore((s) => s.increaseDateBelow);
+  const decreaseDateBelow = useAppStore((s) => s.decreaseDateBelow);
   const setDate = useAppStore((s) => s.setDate);
   const applyBatch = useAppStore((s) => s.applyBatch);
   const getMaxSelectedDate = useAppStore((s) => s.getMaxSelectedDate);
@@ -134,6 +138,12 @@ export function ReportDetailPage() {
         break;
       case "decreaseDate":
         decreaseDate(report.id);
+        break;
+      case "increaseDateBelow":
+        increaseDateBelow(report.id);
+        break;
+      case "decreaseDateBelow":
+        decreaseDateBelow(report.id);
         break;
       case "setDate":
         setDateValue(getMaxSelectedDate(report.id) ?? todayIso());
@@ -530,6 +540,10 @@ function ActionIcon({ action }: { action: DetailAction }) {
       return <CalendarPlus size={size} />;
     case "decreaseDate":
       return <CalendarMinus size={size} />;
+    case "increaseDateBelow":
+      return <span className="cal-ctrl-icon">++</span>;
+    case "decreaseDateBelow":
+      return <span className="cal-ctrl-icon">−−</span>;
     case "setDate":
       return <CalendarRange size={size} />;
     case "addZero":

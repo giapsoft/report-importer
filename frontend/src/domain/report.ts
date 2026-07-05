@@ -126,6 +126,29 @@ export function createEmptyRow(columns: ReportColumn[], dateOverride?: string | 
   return { values };
 }
 
+/** Dòng mới khi nhân bản: FlexNumber trống; chỉ copy các cột Date từ dòng nguồn. */
+export function createDuplicateRow(
+  columns: ReportColumn[],
+  source: ReportRow | null,
+): ReportRow {
+  const values: CellValue[] = [];
+  for (let ci = 0; ci < columns.length; ci++) {
+    const col = columns[ci];
+    if (col.type === "Date") {
+      let value = todayIso();
+      if (source) {
+        const vi = columnIndexToValueIndex(columns, ci);
+        const cell = source.values[vi];
+        if (cell?.kind === "Date") value = cell.value;
+      }
+      values.push({ kind: "Date", value });
+    } else if (col.type === "FlexNumber") {
+      values.push({ kind: "FlexNumber", originalValue: 0, multiplier: 1 });
+    }
+  }
+  return { values };
+}
+
 export function createBatchRows(
   report: Report,
   selectedColumnIndex: number,
@@ -182,6 +205,24 @@ export function mapSelectedDateCells(
 ): ReportRow[] {
   return report.rows.map((row, ri) => {
     if (!selectedRowIndexes.includes(ri)) return row;
+    const vi = columnIndexToValueIndex(report.columns, columnIndex);
+    const cell = row.values[vi];
+    if (!cell || cell.kind !== "Date") return row;
+    const next = [...row.values];
+    next[vi] = mapper(cell);
+    return { values: next };
+  });
+}
+
+/** Áp dụng mapper cho cột Date từ fromRowIndex đến hết bảng. */
+export function mapDateCellsFromRowToEnd(
+  report: Report,
+  fromRowIndex: number,
+  columnIndex: number,
+  mapper: (cell: CellValueDate) => CellValueDate,
+): ReportRow[] {
+  return report.rows.map((row, ri) => {
+    if (ri < fromRowIndex) return row;
     const vi = columnIndexToValueIndex(report.columns, columnIndex);
     const cell = row.values[vi];
     if (!cell || cell.kind !== "Date") return row;

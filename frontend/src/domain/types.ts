@@ -45,6 +45,8 @@ export type DetailAction =
   | "exportExcel"
   | "increaseDate"
   | "decreaseDate"
+  | "increaseDateBelow"
+  | "decreaseDateBelow"
   | "setDate"
   | "addZero"
   | "removeZero"

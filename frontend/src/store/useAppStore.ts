@@ -2,9 +2,10 @@ import { create } from "zustand";
 import { api } from "@/api/client";
 import {
   createBatchRows,
-  createEmptyRow,
+  createDuplicateRow,
   getMetaString,
   mapSelectedDateCells,
+  mapDateCellsFromRowToEnd,
   mapSelectedFlexCells,
   bumpDate,
   maxDateInFirstDateColumn,
@@ -56,6 +57,8 @@ interface AppState {
   updateOriginalValue: (reportId: string, originalValue: number) => void;
   increaseDate: (reportId: string) => void;
   decreaseDate: (reportId: string) => void;
+  increaseDateBelow: (reportId: string) => void;
+  decreaseDateBelow: (reportId: string) => void;
   setDate: (reportId: string, date: string) => void;
   applyBatch: (
     reportId: string,
@@ -284,21 +287,9 @@ export const useAppStore = create<AppState>((set, get) => ({
       // Chèn ngay dưới dòng được chọn (hoặc cuối danh sách)
       const insertAt =
         selected.length > 0 ? Math.max(...selected) + 1 : r.rows.length;
-      // Nhân bản dòng ngay phía trên vị trí chèn
+      // Nhân bản: dòng trống, chỉ giữ ngày từ dòng ngay phía trên (nếu có)
       const source = insertAt > 0 ? r.rows[insertAt - 1] : null;
-      const row = source
-        ? {
-            values: source.values.map((cell) =>
-              cell.kind === "Date"
-                ? { kind: "Date" as const, value: cell.value }
-                : {
-                    kind: "FlexNumber" as const,
-                    originalValue: cell.originalValue,
-                    multiplier: cell.multiplier,
-                  },
-            ),
-          }
-        : createEmptyRow(r.columns);
+      const row = createDuplicateRow(r.columns, source);
       const rows = [...r.rows];
       rows.splice(insertAt, 0, row);
       return { ...r, rows };
@@ -390,6 +381,30 @@ export const useAppStore = create<AppState>((set, get) => ({
     get().updateReport(reportId, (r) => ({
       ...r,
       rows: mapSelectedDateCells(r, selectedRowIndexes, selectedColumnIndex, (c) =>
+        bumpDate(c, -1),
+      ),
+    }));
+  },
+
+  increaseDateBelow: (reportId) => {
+    const { selectedColumnIndex, selectedRowIndexes } = get();
+    if (selectedRowIndexes.length === 0) return;
+    const fromRow = Math.min(...selectedRowIndexes);
+    get().updateReport(reportId, (r) => ({
+      ...r,
+      rows: mapDateCellsFromRowToEnd(r, fromRow, selectedColumnIndex, (c) =>
+        bumpDate(c, 1),
+      ),
+    }));
+  },
+
+  decreaseDateBelow: (reportId) => {
+    const { selectedColumnIndex, selectedRowIndexes } = get();
+    if (selectedRowIndexes.length === 0) return;
+    const fromRow = Math.min(...selectedRowIndexes);
+    get().updateReport(reportId, (r) => ({
+      ...r,
+      rows: mapDateCellsFromRowToEnd(r, fromRow, selectedColumnIndex, (c) =>
         bumpDate(c, -1),
       ),
     }));

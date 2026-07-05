@@ -26,7 +26,13 @@ export function availableActions(
   }
 
   if (column.type === "Date") {
-    list.push("decreaseDate", "setDate", "increaseDate");
+    list.push(
+      "decreaseDateBelow",
+      "decreaseDate",
+      "setDate",
+      "increaseDate",
+      "increaseDateBelow",
+    );
   }
   if (column.type === "FlexNumber") {
     list.push("removeZero", "updateOriginalValue", "addZero");
@@ -41,6 +47,8 @@ export const ACTION_LABELS: Record<DetailAction, string> = {
   exportExcel: "Export Excel",
   increaseDate: "Ngày +1",
   decreaseDate: "Ngày -1",
+  increaseDateBelow: "Ngày +1 (xuống cuối)",
+  decreaseDateBelow: "Ngày -1 (xuống cuối)",
   setDate: "Đặt ngày",
   addZero: "Thêm 0",
   removeZero: "Bớt 0",
