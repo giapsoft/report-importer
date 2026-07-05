@@ -50,6 +50,8 @@ interface AppState {
   /** Header STT: chọn / bỏ chọn tất cả dòng. */
   toggleSelectAllRows: (rowCount: number) => void;
   clearRowSelection: () => void;
+  /** Chọn đúng một dòng (dùng khi đọc số theo hàng). */
+  selectSingleRow: (rowIndex: number) => void;
   insertRow: (reportId: string) => void;
   deleteSelectedRows: (reportId: string) => void;
   addZero: (reportId: string) => void;
@@ -280,6 +282,9 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   clearRowSelection: () =>
     set({ selectedRowIndexes: [], startShiftRowIndex: -1 }),
+
+  selectSingleRow: (rowIndex) =>
+    set({ selectedRowIndexes: [rowIndex], startShiftRowIndex: -1 }),
 
   insertRow: (reportId) => {
     get().updateReport(reportId, (r) => {

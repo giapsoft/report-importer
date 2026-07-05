@@ -18,6 +18,10 @@ export function isValueColumn(col: ReportColumn): boolean {
   return col.type === "Date" || col.type === "FlexNumber";
 }
 
+export function isNumericColumn(col: ReportColumn | null | undefined): boolean {
+  return col?.type === "FlexNumber" || col?.type === "SummaryColumn";
+}
+
 /** Map index cột (trong report.columns) → index trong row.values */
 export function columnIndexToValueIndex(
   columns: ReportColumn[],

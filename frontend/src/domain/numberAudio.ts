@@ -1,15 +1,40 @@
 const SOUND_BASE = `${import.meta.env.BASE_URL}sounds/digits/`;
 
-function extractDigitChars(raw: string | number): string[] {
+const VOCAB_AUDIO_KEYS = ["trieu", "nghin"] as const;
+type VocabAudioKey = (typeof VOCAB_AUDIO_KEYS)[number];
+
+/** Chuyển số thành chuỗi token phát âm: chữ số + triệu/nghìn thay cụm 0 cuối. */
+export function extractAudioTokens(raw: string | number): string[] {
   const s = String(raw).replace(/\./g, "").trim();
   if (!s) return [];
-  const body = s.startsWith("-") ? s.slice(1) : s;
+
+  const negative = s.startsWith("-");
+  const body = negative ? s.slice(1) : s;
   if (!/^\d+$/.test(body)) {
     const n = Number(s);
     if (!Number.isFinite(n)) return [];
-    return String(Math.trunc(Math.abs(n))).split("");
+    return extractAudioTokens(String(Math.trunc(Math.abs(n))));
   }
-  return body.split("");
+
+  let digits = body;
+  const suffixes: VocabAudioKey[] = [];
+
+  while (true) {
+    if (digits.endsWith("000000")) {
+      digits = digits.slice(0, -6);
+      suffixes.push("trieu");
+      continue;
+    }
+    if (digits.endsWith("000")) {
+      digits = digits.slice(0, -3);
+      suffixes.push("nghin");
+      continue;
+    }
+    break;
+  }
+
+  const prefix = digits.split("");
+  return [...prefix, ...suffixes];
 }
 
 export function isAudioPlaybackSupported(): boolean {
@@ -110,6 +135,9 @@ async function preloadAll(ctx: AudioContext): Promise<void> {
     for (let d = 0; d <= 9; d++) {
       loads.push(loadBuffer(ctx, String(d), `${SOUND_BASE}${d}.wav`));
     }
+    for (const word of VOCAB_AUDIO_KEYS) {
+      loads.push(loadBuffer(ctx, word, `${SOUND_BASE}${word}.wav`));
+    }
     loads.push(loadBuffer(ctx, "ting", `${SOUND_BASE}ting.wav`));
     await Promise.all(loads);
   })();
@@ -201,8 +229,8 @@ export function playNumberListAudio(
   const parts = values
     .map((v) => String(v).trim())
     .filter(Boolean)
-    .map((v) => extractDigitChars(v))
-    .filter((digits) => digits.length > 0);
+    .map((v) => extractAudioTokens(v))
+    .filter((tokens) => tokens.length > 0);
 
   if (parts.length === 0) {
     options?.onError?.("Không có số hợp lệ để đọc");
@@ -234,8 +262,8 @@ export function playNumberListAudio(
 
         for (let j = 0; j < parts[i].length; j++) {
           if (signal.aborted) break;
-          const digit = parts[i][j];
-          const buf = bufferCache.get(digit);
+          const token = parts[i][j];
+          const buf = bufferCache.get(token);
           if (buf) await playBuffer(ctx, buf, signal);
         }
 

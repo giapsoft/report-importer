@@ -37,6 +37,11 @@ DIGITS: dict[str, str] = {
     "9": "chín",
 }
 
+VOCAB: dict[str, str] = {
+    "trieu": "triệu",
+    "nghin": "nghìn",
+}
+
 FFMPEG = shutil.which("ffmpeg")
 
 
@@ -124,7 +129,7 @@ async def generate_digit_wav(digit: str, word: str) -> None:
     finally:
         raw_path.unlink(missing_ok=True)
 
-    print(f"  {out.name}: {out.stat().st_size:,} bytes")
+    print(f"  wrote {out.name} ({out.stat().st_size:,} bytes)")
 
 
 def generate_ting_wav() -> None:
@@ -157,7 +162,7 @@ def generate_ting_wav() -> None:
         wf.setframerate(sample_rate)
         wf.writeframes(b"".join(struct.pack("<h", s) for s in frames))
 
-    print(f"  {out.name}: {out.stat().st_size:,} bytes")
+    print(f"  wrote {out.name} ({out.stat().st_size:,} bytes)")
 
 
 def remove_legacy_mp3() -> None:
@@ -175,6 +180,9 @@ async def main() -> None:
 
     for digit, word in DIGITS.items():
         await generate_digit_wav(digit, word)
+
+    for key, word in VOCAB.items():
+        await generate_digit_wav(key, word)
 
     generate_ting_wav()
     remove_legacy_mp3()

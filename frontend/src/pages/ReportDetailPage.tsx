@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft,
@@ -10,13 +10,19 @@ import {
   Trash2,
   Upload,
   FileSpreadsheet,
+  Volume2,
+  Square,
 } from "lucide-react";
 import {
   availableActions,
   ACTION_LABELS,
   HEADER_DETAIL_ACTIONS,
 } from "@/domain/actions";
-import { getColumnSumDisplay, getRowDisplayString } from "@/domain/report";
+import { getColumnSumDisplay, getRowDisplayString, isNumericColumn } from "@/domain/report";
+import {
+  playNumberListAudio,
+  unlockNumberAudio,
+} from "@/domain/numberAudio";
 import { stringToNumber } from "@/domain/stringToNumber";
 import type { DetailAction } from "@/domain/types";
 
@@ -57,6 +63,7 @@ export function ReportDetailPage() {
   const toggleRowSingle = useAppStore((s) => s.toggleRowSingle);
   const toggleRowRange = useAppStore((s) => s.toggleRowRange);
   const toggleSelectAllRows = useAppStore((s) => s.toggleSelectAllRows);
+  const selectSingleRow = useAppStore((s) => s.selectSingleRow);
   const setSplitter = useAppStore((s) => s.setSplitter);
   const renameReport = useAppStore((s) => s.renameReport);
   const insertRow = useAppStore((s) => s.insertRow);
@@ -84,6 +91,9 @@ export function ReportDetailPage() {
   const [batchInputOpen, setBatchInputOpen] = useState(false);
   const [batchConfirm, setBatchConfirm] = useState<number[] | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
+  const [speakingRows, setSpeakingRows] = useState(false);
+  const stopSpeechRef = useRef<(() => void) | null>(null);
+  const rowRefs = useRef<(HTMLTableRowElement | null)[]>([]);
 
   const {
     wrapRef: tableScrollRef,
@@ -97,6 +107,21 @@ export function ReportDetailPage() {
     resetDetailSelection();
     return () => resetDetailSelection();
   }, [id, resetDetailSelection]);
+
+  useEffect(() => {
+    return () => {
+      stopSpeechRef.current?.();
+      stopSpeechRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!speakingRows || selectedRowIndexes.length !== 1) return;
+    rowRefs.current[selectedRowIndexes[0]]?.scrollIntoView({
+      behavior: "smooth",
+      block: "nearest",
+    });
+  }, [selectedRowIndexes, speakingRows]);
 
   const actions = useMemo(() => {
     if (!report) return [] as DetailAction[];
@@ -168,51 +193,140 @@ export function ReportDetailPage() {
     }
   };
 
+  const selectedNumericColumn =
+    selectedColumnIndex >= 0 &&
+    isNumericColumn(report.columns[selectedColumnIndex]);
+
+  const showListenRows =
+    selectedNumericColumn && report.rows.length > 0;
+
+  const finishListeningRows = () => {
+    setSpeakingRows(false);
+    stopSpeechRef.current = null;
+  };
+
+  const stopListenRows = () => {
+    stopSpeechRef.current?.();
+  };
+
+  const startListenRows = () => {
+    if (!showListenRows) return;
+
+    const startRow =
+      selectedRowIndexes.length > 0
+        ? Math.min(...selectedRowIndexes)
+        : 0;
+    const listenableEntries = report.rows
+      .slice(startRow)
+      .map((row, offset) => ({
+        rowIndex: startRow + offset,
+        value: getRowDisplayString(report, row, selectedColumnIndex)
+          .replace(/\./g, "")
+          .trim(),
+      }))
+      .filter((entry) => entry.value.length > 0);
+
+    if (listenableEntries.length === 0) return;
+
+    const values = listenableEntries.map((entry) => entry.value);
+    let startAtIndex = 0;
+    if (selectedRowIndexes.length > 0) {
+      const anchorRow = Math.min(...selectedRowIndexes);
+      const fromSelected = listenableEntries.findIndex(
+        (entry) => entry.rowIndex === anchorRow,
+      );
+      if (fromSelected >= 0) startAtIndex = fromSelected;
+    }
+
+    unlockNumberAudio();
+    stopSpeechRef.current?.();
+    const { stop } = playNumberListAudio(values, {
+      startAtIndex,
+      onStart: () => setSpeakingRows(true),
+      onItemStart: (valueIndex) => {
+        selectSingleRow(listenableEntries[valueIndex].rowIndex);
+      },
+      onEnd: finishListeningRows,
+      onError: () => finishListeningRows,
+    });
+    stopSpeechRef.current = stop;
+  };
+
   return (
     <div className="app-shell">
-      <header className="page-header">
+      <header className={`page-header${speakingRows ? " speaking" : ""}`}>
         <div className="header-row">
-          <button
-            type="button"
-            className="icon-btn"
-            onClick={() => navigate("/")}
-            aria-label="Quay lại"
-          >
-            <ArrowLeft size={20} />
-          </button>
-          <button
-            type="button"
-            className="left header-title-btn"
-            aria-label="Sửa báo cáo"
-            title="Sửa báo cáo"
-            onClick={() => {
-              setEditName(report.name);
-              setEditSplitter(splitter);
-              setEditOpen(true);
-            }}
-          >
-            <h1>{report.name}</h1>
-            <div className="meta">{reportMeta(report) || "—"}</div>
-          </button>
-          <div className="header-actions">
-            {HEADER_DETAIL_ACTIONS.map((action) => {
-              const disabled =
-                action === "deleteRows" && selectedRowIndexes.length === 0;
-              return (
-                <button
-                  key={action}
-                  type="button"
-                  className={`icon-btn ${action === "deleteRows" ? "danger" : ""}`}
-                  aria-label={ACTION_LABELS[action]}
-                  title={ACTION_LABELS[action]}
-                  disabled={disabled}
-                  onClick={() => runAction(action)}
-                >
-                  <ActionIcon action={action} />
-                </button>
-              );
-            })}
-          </div>
+          {speakingRows ? (
+            <button
+              type="button"
+              className="header-listen-stop"
+              onClick={stopListenRows}
+              title="Dừng đọc"
+              aria-label="Dừng đọc"
+            >
+              <Square size={18} />
+              <span>Dừng</span>
+            </button>
+          ) : (
+            <>
+              <button
+                type="button"
+                className="icon-btn"
+                onClick={() => navigate("/")}
+                aria-label="Quay lại"
+              >
+                <ArrowLeft size={20} />
+              </button>
+              <button
+                type="button"
+                className="left header-title-btn"
+                aria-label="Sửa báo cáo"
+                title="Sửa báo cáo"
+                onClick={() => {
+                  setEditName(report.name);
+                  setEditSplitter(splitter);
+                  setEditOpen(true);
+                }}
+              >
+                <h1>{report.name}</h1>
+                <div className="meta">{reportMeta(report) || "—"}</div>
+              </button>
+              <div className="header-actions">
+                {HEADER_DETAIL_ACTIONS.flatMap((action) => {
+                  const disabled =
+                    action === "deleteRows" && selectedRowIndexes.length === 0;
+                  const buttons = [
+                    <button
+                      key={action}
+                      type="button"
+                      className={`icon-btn ${action === "deleteRows" ? "danger" : ""}`}
+                      aria-label={ACTION_LABELS[action]}
+                      title={ACTION_LABELS[action]}
+                      disabled={disabled}
+                      onClick={() => runAction(action)}
+                    >
+                      <ActionIcon action={action} />
+                    </button>,
+                  ];
+                  if (action === "deleteRows" && showListenRows) {
+                    buttons.push(
+                      <button
+                        key="listen-rows"
+                        type="button"
+                        className="icon-btn"
+                        aria-label="Đọc số từ hàng đã chọn xuống dưới"
+                        title="Đọc số từ hàng đã chọn xuống dưới"
+                        onClick={startListenRows}
+                      >
+                        <Volume2 size={18} />
+                      </button>,
+                    );
+                  }
+                  return buttons;
+                })}
+              </div>
+            </>
+          )}
         </div>
       </header>
 
@@ -276,7 +390,15 @@ export function ReportDetailPage() {
                   return (
                     <tr
                       key={rowIndex}
-                      className={selected ? "row-selected" : ""}
+                      ref={(el) => {
+                        rowRefs.current[rowIndex] = el;
+                      }}
+                      className={[
+                        selected ? "row-selected" : "",
+                        speakingRows && selected ? "row-speaking" : "",
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
                     >
                       <td
                         className="stt-cell"
