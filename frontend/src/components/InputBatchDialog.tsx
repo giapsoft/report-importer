@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { toThousandSeparatorString } from "@/domain/format";
 import { parseBatchNumbers } from "@/domain/stringToNumber";
 import { enterToSubmit, formSubmit } from "@/utils/enterSubmit";
 import { Dialog } from "./Dialog";
@@ -16,6 +17,15 @@ export function InputBatchDialog({
 }: InputBatchDialogProps) {
   const [text, setText] = useState("");
 
+  const previewNumbers = useMemo(
+    () => (text.trim() ? parseBatchNumbers(text, splitter) : []),
+    [text, splitter],
+  );
+
+  const previewLabel = previewNumbers
+    .map((n) => toThousandSeparatorString(n))
+    .join(", ");
+
   const apply = () => onApply(parseBatchNumbers(text, splitter));
 
   return (
@@ -26,6 +36,13 @@ export function InputBatchDialog({
         </p>
         <div className="field">
           <label htmlFor="batch-input">Dữ liệu</label>
+          {text.trim() && (
+            <output className="batch-preview" htmlFor="batch-input">
+              {previewNumbers.length > 0
+                ? previewLabel
+                : "— chưa phân tích được số nào —"}
+            </output>
+          )}
           <textarea
             id="batch-input"
             value={text}

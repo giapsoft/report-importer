@@ -1,6 +1,8 @@
 /**
  * Chuyển text lẫn tạp (speech-to-text, tiếng Việt, ký tự thừa) thành số nguyên.
- * Trả về null nếu không trích được số hợp lệ.
+ *
+ * Quy tắc đọc: ghép từng chữ số theo thứ tự (vd. "một ba hai" → 132,
+ * "tám một" / "chữ 8 số 1" → 81), không cộng hàng đơn vị.
  */
 export function stringToNumber(raw: string): number | null {
   if (raw == null) return null;
@@ -13,72 +15,14 @@ export function stringToNumber(raw: string): number | null {
     .replace(/\s+/g, " ")
     .trim();
 
-  // Ưu tiên dạng số viết liền / có dấu phân cách
-  const digitMatch = extractDigitNumber(text);
-  if (digitMatch != null) return digitMatch;
+  const digits = collectDigits(text);
+  if (!digits || digits.length === 0) return null;
 
-  // Dạng chữ số tiếng Việt + hậu tố đơn vị
-  const wordMatch = extractVietnameseWordNumber(text);
-  if (wordMatch != null) return wordMatch;
-
-  return null;
+  const n = Number(digits.join(""));
+  return Number.isNaN(n) ? null : n;
 }
 
-function extractDigitNumber(text: string): number | null {
-  // Bắt cụm số kiểu: 1.234.567 | 1,234,567 | 1234567 | 1.5tr | 100k | 2 triệu
-  const patterns: RegExp[] = [
-    /([+-]?\d{1,3}(?:[.,]\d{3})+)(?:\s*(k|nghin|nghìn|ngàn|ngan|tr|trieu|triệu|m))?/i,
-    /([+-]?\d+(?:[.,]\d+)?)(?:\s*(k|nghin|nghìn|ngàn|ngan|tr|trieu|triệu|m))?/i,
-  ];
-
-  for (const re of patterns) {
-    const m = text.match(re);
-    if (!m) continue;
-    const unit = (m[2] ?? "").toLowerCase();
-    const numPart = m[1];
-    const base = parseLocalizedNumber(numPart);
-    if (base == null || Number.isNaN(base)) continue;
-    return Math.trunc(applyUnit(base, unit));
-  }
-  return null;
-}
-
-function parseLocalizedNumber(s: string): number | null {
-  const cleaned = s.replace(/\s/g, "");
-  if (!cleaned) return null;
-
-  // 1.234.567 hoặc 1,234,567 (phân cách hàng nghìn)
-  if (/^[+-]?\d{1,3}([.,]\d{3})+$/.test(cleaned)) {
-    return Number(cleaned.replace(/[.,]/g, ""));
-  }
-
-  // 1.5 hoặc 1,5 (thập phân)
-  if (/^[+-]?\d+[.,]\d+$/.test(cleaned)) {
-    return Number(cleaned.replace(",", "."));
-  }
-
-  if (/^[+-]?\d+$/.test(cleaned)) return Number(cleaned);
-  return null;
-}
-
-function applyUnit(n: number, unit: string): number {
-  switch (unit) {
-    case "k":
-    case "nghin":
-    case "nghìn":
-    case "ngan":
-    case "ngàn":
-      return n * 1_000;
-    case "tr":
-    case "trieu":
-    case "triệu":
-    case "m":
-      return n * 1_000_000;
-    default:
-      return n;
-  }
-}
-
+/** Chữ số 0–9 bằng tiếng Việt (và biến thể speech-to-text). */
 const DIGIT_WORDS: Record<string, number> = {
   khong: 0,
   không: 0,
@@ -86,6 +30,7 @@ const DIGIT_WORDS: Record<string, number> = {
   mot: 1,
   một: 1,
   mốt: 1,
+  môt: 1,
   hai: 2,
   ba: 3,
   bon: 4,
@@ -106,71 +51,217 @@ const DIGIT_WORDS: Record<string, number> = {
   chín: 9,
 };
 
-const MULTIPLIERS: Record<string, number> = {
-  muoi: 10,
-  mười: 10,
-  chuc: 10,
-  chục: 10,
-  tram: 100,
-  trăm: 100,
-  nghin: 1_000,
-  nghìn: 1_000,
-  ngan: 1_000,
-  ngàn: 1_000,
-  trieu: 1_000_000,
-  triệu: 1_000_000,
-  ty: 1_000_000_000,
-  tỷ: 1_000_000_000,
-};
+/** Nhiễu speech-to-text / nhãn đọc số — bỏ qua khi ghép. */
+const NOISE_WORDS = new Set([
+  "chu",
+  "chữ",
+  "ch",
+  "so",
+  "số",
+  "num",
+  "number",
+  "cong",
+  "cộng",
+  "va",
+  "và",
+  "ky",
+  "ký",
+  "tram",
+  "trăm",
+  "nghin",
+  "nghìn",
+  "ngan",
+  "ngàn",
+  "trieu",
+  "triệu",
+  "ty",
+  "tỷ",
+  "k",
+  "tr",
+  "le",
+  "lẻ",
+  "linh",
+  "het",
+  "hết",
+]);
 
-function extractVietnameseWordNumber(text: string): number | null {
-  const tokens = text
-    .split(/[\s,;.]+/)
-    .map((t) => t.trim())
-    .filter(Boolean);
+const TENS_MARKERS = new Set(["muoi", "mười", "mươi", "chuc", "chục"]);
+
+const SORTED_VOCAB = [
+  ...Object.keys(DIGIT_WORDS),
+  ...Array.from(TENS_MARKERS),
+].sort((a, b) => b.length - a.length);
+
+/** Trích dãy chữ số 0–9 theo thứ tự (dùng cho ghép số và batch). */
+function collectDigits(text: string): number[] | null {
+  const tokens = expandTokens(
+    text
+      .split(/[\s,;.]+/)
+      .map((t) => t.trim())
+      .filter(Boolean),
+  );
 
   if (tokens.length === 0) return null;
 
-  let total = 0;
-  let current = 0;
+  const digits: number[] = [];
   let seen = false;
 
-  for (const token of tokens) {
+  for (let i = 0; i < tokens.length; i++) {
+    const token = tokens[i];
+    if (NOISE_WORDS.has(token)) continue;
+
     if (DIGIT_WORDS[token] != null) {
-      current += DIGIT_WORDS[token];
-      seen = true;
+      const d = DIGIT_WORDS[token];
+      // "số 8 chữ tám" — bỏ chữ số trùng liền kề (8 rồi tám)
+      if (digits.length === 0 || digits[digits.length - 1] !== d) {
+        digits.push(d);
+        seen = true;
+      }
       continue;
     }
-    if (MULTIPLIERS[token] != null) {
-      const mul = MULTIPLIERS[token];
-      if (mul === 10) {
-        current = (current === 0 ? 1 : current) * 10;
-      } else if (current === 0) {
-        current = mul;
+
+    if (TENS_MARKERS.has(token)) {
+      const hasNext = hasNextDigitToken(tokens, i + 1);
+      if (digits.length > 0) {
+        if (hasNext) continue;
+        digits.push(0);
+      } else if (hasNext) {
+        digits.push(1);
       } else {
-        current *= mul;
-      }
-      if (mul >= 1000) {
-        total += current;
-        current = 0;
+        digits.push(1, 0);
       }
       seen = true;
       continue;
     }
-    // token nhiễu từ speech-to-text — bỏ qua
+
+    const numeric = token.match(/^[+-]?(\p{N}+)$/u);
+    if (numeric) {
+      for (const ch of numeric[1]) {
+        const d = parseDigitChar(ch);
+        if (d != null) digits.push(d);
+      }
+      seen = true;
+      continue;
+    }
+
+    const embedded = extractEmbeddedDigits(token);
+    if (embedded.length > 0) {
+      digits.push(...embedded);
+      seen = true;
+    }
   }
 
-  if (!seen) return null;
-  return Math.trunc(total + current);
+  if (!seen || digits.length === 0) return null;
+  return digits;
 }
 
-/** Tách input batch theo splitter rồi map sang số, bỏ phần không parse được. */
+function parseDigitChar(ch: string): number | null {
+  if (ch >= "0" && ch <= "9") return Number(ch);
+  const cp = ch.codePointAt(0);
+  if (cp == null) return null;
+  // Fullwidth / unicode digits
+  if (cp >= 0xff10 && cp <= 0xff19) return cp - 0xff10;
+  return null;
+}
+
+function extractEmbeddedDigits(token: string): number[] {
+  const out: number[] = [];
+  for (const ch of token) {
+    const d = parseDigitChar(ch);
+    if (d != null) out.push(d);
+  }
+  return out;
+}
+
+function expandTokens(rawTokens: string[]): string[] {
+  const out: string[] = [];
+
+  for (let i = 0; i < rawTokens.length; i++) {
+    const token = rawTokens[i];
+    const next = rawTokens[i + 1];
+
+    if (token === "m" && next && /^(?:ot|ôt|ốt|ột)$/u.test(next)) {
+      out.push("mot");
+      i++;
+      continue;
+    }
+
+    if (/^\p{L}+$/u.test(token) && !DIGIT_WORDS[token] && !TENS_MARKERS.has(token)) {
+      const parts = segmentGluedLetters(token);
+      if (parts.length > 0) {
+        out.push(...parts);
+        continue;
+      }
+    }
+
+    out.push(token);
+  }
+
+  return out;
+}
+
+function segmentGluedLetters(token: string): string[] {
+  const lower = token.toLowerCase().normalize("NFC");
+  const parts: string[] = [];
+  let i = 0;
+
+  while (i < lower.length) {
+    let matched: string | null = null;
+    for (const w of SORTED_VOCAB) {
+      if (lower.startsWith(w, i)) {
+        matched = w;
+        break;
+      }
+    }
+    if (!matched) return [];
+    parts.push(matched);
+    i += matched.length;
+  }
+
+  return parts;
+}
+
+function hasNextDigitToken(tokens: string[], start: number): boolean {
+  for (let i = start; i < tokens.length; i++) {
+    const t = tokens[i];
+    if (NOISE_WORDS.has(t)) continue;
+    if (TENS_MARKERS.has(t)) continue;
+    if (DIGIT_WORDS[t] != null) return true;
+    if (/^[+-]?\p{N}+$/u.test(t)) return true;
+    if (extractEmbeddedDigits(t).length > 0) return true;
+    return false;
+  }
+  return false;
+}
+
+/**
+ * Tách batch theo splitter.
+ * Nếu splitter cắt nhầm giữa các chữ số đơn (vd. "8 hết 1" → 81, không phải [8,1]).
+ */
 export function parseBatchNumbers(input: string, splitter: string): number[] {
-  const parts = input
-    .toLowerCase()
+  const trimmed = input.toLowerCase().trim();
+  if (!trimmed) return [];
+
+  const parts = trimmed
     .split(new RegExp(escapeRegExp(splitter), "i"))
     .map((s) => s.trim())
     .filter(Boolean);
+
+  if (parts.length <= 1) {
+    const n = stringToNumber(parts[0] ?? trimmed);
+    return n != null ? [n] : [];
+  }
+
+  const groups = parts.map((p) => collectDigits(p)).filter((g): g is number[] => !!g?.length);
+
+  if (
+    groups.length === parts.length &&
+    groups.length >= 2 &&
+    groups.every((g) => g.length === 1)
+  ) {
+    const merged = Number(groups.map((g) => g[0]).join(""));
+    if (!Number.isNaN(merged)) return [merged];
+  }
 
   const numbers: number[] = [];
   for (const part of parts) {

@@ -2,9 +2,25 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { fileURLToPath, URL } from "node:url";
 
+const buildVersion = process.env.VITE_BUILD_VERSION || "dev";
+
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    {
+      name: "inject-build-version",
+      transformIndexHtml(html) {
+        return html.replace(
+          "</head>",
+          `    <meta name="build-version" content="${buildVersion}" />\n  </head>`,
+        );
+      },
+    },
+  ],
   base: process.env.VITE_BASE || "/",
+  define: {
+    __BUILD_VERSION__: JSON.stringify(buildVersion),
+  },
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),

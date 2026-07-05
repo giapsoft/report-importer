@@ -17,6 +17,7 @@ import {
   HEADER_DETAIL_ACTIONS,
 } from "@/domain/actions";
 import { getColumnSumDisplay, getRowDisplayString } from "@/domain/report";
+import { stringToNumber } from "@/domain/stringToNumber";
 import type { DetailAction } from "@/domain/types";
 
 const HOLD_REPEAT_ACTIONS = new Set<DetailAction>([
@@ -32,6 +33,10 @@ import { Dialog } from "@/components/Dialog";
 import { ExportReportDialog } from "@/components/ExportReportDialog";
 import { HoldIconButton } from "@/components/HoldIconButton";
 import { InputBatchDialog } from "@/components/InputBatchDialog";
+import {
+  TableScrollFabButton,
+  useTableScrollFab,
+} from "@/components/TableScrollFab";
 import { reportMeta, useAppStore } from "@/store/useAppStore";
 import { todayIso } from "@/domain/format";
 import { formSubmit } from "@/utils/enterSubmit";
@@ -75,6 +80,14 @@ export function ReportDetailPage() {
   const [batchInputOpen, setBatchInputOpen] = useState(false);
   const [batchConfirm, setBatchConfirm] = useState<number[] | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
+
+  const {
+    wrapRef: tableScrollRef,
+    canScroll: tableCanScroll,
+    atBottom: tableAtBottom,
+    scrollToTop: scrollTableToTop,
+    scrollToBottom: scrollTableToBottom,
+  } = useTableScrollFab([id, report?.rows.length ?? 0]);
 
   useEffect(() => {
     resetDetailSelection();
@@ -194,7 +207,7 @@ export function ReportDetailPage() {
       </header>
 
       <main className="page-body page-body-fill">
-        <div className="table-wrap">
+        <div className="table-wrap" ref={tableScrollRef}>
           <table className="report-table">
             <thead>
               <tr>
@@ -283,6 +296,12 @@ export function ReportDetailPage() {
             </tbody>
           </table>
         </div>
+        <TableScrollFabButton
+          canScroll={tableCanScroll}
+          atBottom={tableAtBottom}
+          onScrollToTop={scrollTableToTop}
+          onScrollToBottom={scrollTableToBottom}
+        />
       </main>
 
       <footer className="page-footer">
@@ -391,9 +410,9 @@ export function ReportDetailPage() {
           <form
             onSubmit={(e) =>
               formSubmit(e, () => {
-                const n = Number(numberValue.replace(/\./g, ""));
-                if (!Number.isFinite(n)) return;
-                updateOriginalValue(report.id, Math.trunc(n));
+                const n = stringToNumber(numberValue);
+                if (n == null) return;
+                updateOriginalValue(report.id, n);
                 setNumberOpen(false);
               })
             }

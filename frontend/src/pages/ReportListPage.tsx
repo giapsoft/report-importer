@@ -5,6 +5,7 @@ import { AddReportDialog } from "@/components/AddReportDialog";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { ExportReportDialog } from "@/components/ExportReportDialog";
 import type { Report } from "@/domain/types";
+import { formatAppVersion } from "@/domain/appVersion";
 import { reportMeta, useAppStore } from "@/store/useAppStore";
 
 export function ReportListPage() {
@@ -25,7 +26,9 @@ export function ReportListPage() {
         <div className="header-row">
           <div className="left">
             <h1>Quản lý báo cáo</h1>
-            <div className="meta">{reports.length} báo cáo</div>
+            <div className="meta">
+              {reports.length} báo cáo · {formatAppVersion()}
+            </div>
           </div>
           <button
             type="button"

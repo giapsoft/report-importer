@@ -203,6 +203,7 @@ button {
 .page-body-fill {
   display: flex;
   flex-direction: column;
+  position: relative;
   padding: 8px 12px;
   padding-bottom: 8px;
   overflow: hidden;
@@ -284,6 +285,32 @@ button {
   border-radius: 12px;
   overflow: auto;
   box-shadow: var(--shadow);
+}
+
+.scroll-jump-btn {
+  position: absolute;
+  right: 20px;
+  bottom: 12px;
+  z-index: 15;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 14px;
+  border: none;
+  border-radius: 999px;
+  background: var(--header);
+  color: #fff;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.28);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.scroll-jump-btn:active {
+  transform: scale(0.97);
+  opacity: 0.92;
 }
 
 .report-table td,
@@ -571,6 +598,57 @@ button {
   padding: 8px 10px;
 }
 
+.batch-insert-btn {
+  flex-shrink: 0;
+  padding: 8px 10px;
+  min-width: 0;
+}
+
+.batch-listen-panel {
+  margin-top: 8px;
+}
+
+.batch-listen-speed {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+  font-size: 0.875rem;
+}
+
+.batch-listen-speed input[type="range"] {
+  flex: 1;
+  min-width: 0;
+}
+
+.batch-listen-speed-value {
+  min-width: 3.2rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.batch-listen-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  justify-content: center;
+}
+
+.batch-listen-btn.speaking {
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.batch-listen-error {
+  margin: 8px 0 0;
+  font-size: 0.8125rem;
+  color: #b91c1c;
+  line-height: 1.4;
+}
+
 .date-stepper {
   display: flex;
   align-items: center;
@@ -608,6 +686,23 @@ button {
   font-size: 0.82rem;
   color: var(--muted);
   margin: 0 0 8px;
+}
+
+.batch-preview {
+  display: block;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--primary);
+  background: var(--primary-soft);
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin: 0 0 8px;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.batch-preview:empty {
+  display: none;
 }
 
 .parts-picker {
