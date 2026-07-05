@@ -59,7 +59,7 @@ interface TableScrollFabButtonProps {
   onScrollToBottom: () => void;
 }
 
-/** Nút lơ lửng: giữa/trên → xuống cuối; ở cuối → lên đầu. */
+/** Nút cuộn bảng: giữa/trên → xuống cuối; ở cuối → lên đầu. */
 export function TableScrollFabButton({
   canScroll,
   atBottom,
@@ -73,12 +73,12 @@ export function TableScrollFabButton({
   return (
     <button
       type="button"
-      className="scroll-jump-btn"
+      className="icon-btn"
       aria-label={goTop ? "Lăn lên đầu" : "Lăn xuống cuối"}
       title={goTop ? "Lăn lên đầu" : "Lăn xuống cuối"}
       onClick={goTop ? onScrollToTop : onScrollToBottom}
     >
-      {goTop ? <ChevronUp size={22} /> : <ChevronDown size={22} />}
+      {goTop ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
     </button>
   );
 }

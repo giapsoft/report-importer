@@ -60,16 +60,14 @@ export function ConfirmBatchDialog({
   );
   const [date, setDate] = useState(initialDate ?? "");
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
-  const [draftValue, setDraftValue] = useState("");
   const [speaking, setSpeaking] = useState(false);
   const [listenSpeed, setListenSpeed] = useState(getNumberAudioPlaybackRate);
   const [listenError, setListenError] = useState<string | null>(null);
   const stopSpeechRef = useRef<(() => void) | null>(null);
   const chipRefs = useRef<(HTMLDivElement | null)[]>([]);
-  const draftRef = useRef<HTMLDivElement | null>(null);
   const keepListenSelectionRef = useRef(false);
   const activeChipValue =
-    selectedIndex !== null ? numbers[selectedIndex] ?? "" : draftValue;
+    selectedIndex !== null ? numbers[selectedIndex] ?? "" : "";
 
   useEffect(() => {
     return () => {
@@ -79,23 +77,14 @@ export function ConfirmBatchDialog({
   }, []);
 
   useEffect(() => {
-    if (selectedIndex !== null) {
-      chipRefs.current[selectedIndex]?.scrollIntoView({
-        behavior: "smooth",
-        block: "nearest",
-      });
-      return;
-    }
-    if (draftValue) {
-      draftRef.current?.scrollIntoView({
-        behavior: "smooth",
-        block: "nearest",
-      });
-    }
-  }, [selectedIndex, activeChipValue, draftValue]);
+    if (selectedIndex === null) return;
+    chipRefs.current[selectedIndex]?.scrollIntoView({
+      behavior: "smooth",
+      block: "nearest",
+    });
+  }, [selectedIndex, activeChipValue]);
 
   const toggleSelect = (index: number) => {
-    setDraftValue("");
     setSelectedIndex((prev) => (prev === index ? null : index));
   };
 
@@ -118,38 +107,30 @@ export function ConfirmBatchDialog({
       );
       return;
     }
-    setDraftValue((prev) => prev + digit);
+    setNumbers((prev) => {
+      const nextIndex = prev.length;
+      setSelectedIndex(nextIndex);
+      return [...prev, digit];
+    });
   };
 
   const backspaceInput = () => {
-    if (selectedIndex !== null) {
-      setNumbers((prev) =>
-        prev.map((n, i) => (i === selectedIndex ? n.slice(0, -1) : n)),
-      );
-      return;
-    }
-    setDraftValue((prev) => prev.slice(0, -1));
+    if (selectedIndex === null) return;
+    setNumbers((prev) =>
+      prev.map((n, i) => (i === selectedIndex ? n.slice(0, -1) : n)),
+    );
   };
 
   const handleEnter = () => {
-    if (selectedIndex !== null) {
-      unlockNumberAudio();
-      playTingKeySound();
-      setSelectedIndex(null);
-      return;
-    }
-    const value = draftValue.trim();
-    if (!value) return;
+    if (selectedIndex === null) return;
     unlockNumberAudio();
     playTingKeySound();
-    setNumbers((prev) => [...prev, value]);
-    setDraftValue("");
+    setSelectedIndex(null);
   };
 
   const insertChipAfterSelected = () => {
     if (selectedIndex === null) return;
     const insertAt = selectedIndex + 1;
-    setDraftValue("");
     setNumbers((prev) => [
       ...prev.slice(0, insertAt),
       "",
@@ -200,7 +181,6 @@ export function ConfirmBatchDialog({
 
     unlockNumberAudio();
     setListenError(null);
-    setDraftValue("");
     stopSpeechRef.current?.();
     const { stop } = playNumberListAudio(values, {
       startAtIndex,
@@ -220,8 +200,7 @@ export function ConfirmBatchDialog({
   };
 
   const listenAvailable = isAudioPlaybackSupported();
-  const enterDisabled =
-    selectedIndex === null && draftValue.trim().length === 0;
+  const enterDisabled = selectedIndex === null;
 
   const parseNumbers = () =>
     numbers
@@ -296,14 +275,6 @@ export function ConfirmBatchDialog({
                 </div>
               );
             })}
-            {draftValue && (
-              <div
-                ref={draftRef}
-                className="batch-number-chip draft selected"
-              >
-                <span className="batch-number-chip-main">{draftValue}</span>
-              </div>
-            )}
           </div>
         </div>
 
@@ -420,16 +391,8 @@ export function ConfirmBatchDialog({
               className="btn batch-numpad-key batch-numpad-enter"
               disabled={enterDisabled}
               onClick={handleEnter}
-              title={
-                selectedIndex !== null
-                  ? "Hoàn tất nhập số đang chọn"
-                  : "Thêm số mới vào cuối danh sách"
-              }
-              aria-label={
-                selectedIndex !== null
-                  ? "Hoàn tất nhập số đang chọn"
-                  : "Thêm số mới vào cuối danh sách"
-              }
+              title="Hoàn tất nhập số đang chọn"
+              aria-label="Hoàn tất nhập số đang chọn"
             >
               <CornerDownLeft size={20} />
             </button>

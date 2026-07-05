@@ -306,12 +306,6 @@ export function ReportDetailPage() {
             </tbody>
           </table>
         </div>
-        <TableScrollFabButton
-          canScroll={tableCanScroll}
-          atBottom={tableAtBottom}
-          onScrollToTop={scrollTableToTop}
-          onScrollToBottom={scrollTableToBottom}
-        />
       </main>
 
       <footer className="page-footer">
@@ -345,6 +339,12 @@ export function ReportDetailPage() {
               )}
           </div>
           <div className="actions-row-right">
+            <TableScrollFabButton
+              canScroll={tableCanScroll}
+              atBottom={tableAtBottom}
+              onScrollToTop={scrollTableToTop}
+              onScrollToBottom={scrollTableToBottom}
+            />
             {actions.includes("insertRow") && (
               <button
                 type="button"
