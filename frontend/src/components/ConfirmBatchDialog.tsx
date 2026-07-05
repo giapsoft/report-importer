@@ -120,112 +120,117 @@ export function ConfirmBatchDialog({
     insertAfterRowIndex != null && insertAfterRowIndex >= 0;
 
   return (
-    <Dialog title="Xác nhận danh sách số">
-      <form onSubmit={(e) => formSubmit(e, submitAppend)}>
+    <Dialog
+      title="Xác nhận danh sách số"
+      fullscreen
+      headerAction={
+        <button type="button" className="btn" onClick={onCancel}>
+          Hủy
+        </button>
+      }
+    >
+      <form
+        className="dialog-fullscreen-form"
+        onSubmit={(e) => formSubmit(e, submitAppend)}
+      >
         {hasDateColumn && date && (
-          <div className="field">
-            <label>Ngày</label>
+          <div className="dialog-fullscreen-top field">
             <DateStepper value={date} onChange={setDate} />
           </div>
         )}
 
-        <div className="batch-numbers">
-          {numbers.map((n, i) => (
-            <div className="batch-number-row" key={i}>
-              <input
-                inputMode="numeric"
-                enterKeyHint="done"
-                value={n}
-                onChange={(e) => updateAt(i, e.target.value)}
-                aria-label={`Số ${i + 1}: ${toThousandSeparatorString(Number(n) || 0)}`}
-              />
-              <button
-                type="button"
-                className="btn batch-insert-btn"
-                onClick={() => insertAfter(i)}
-                title="Chèn số bên dưới"
-                aria-label={`Chèn số bên dưới số ${i + 1}`}
-              >
-                <Plus size={16} />
-              </button>
-              <button
-                type="button"
-                className="btn danger"
-                onClick={() => removeAt(i)}
-              >
-                Xóa
+        <div className="dialog-fullscreen-body">
+          <div className="batch-numbers">
+            {numbers.map((n, i) => (
+              <div className="batch-number-row" key={i}>
+                <input
+                  inputMode="numeric"
+                  enterKeyHint="done"
+                  value={n}
+                  onChange={(e) => updateAt(i, e.target.value)}
+                  aria-label={`Số ${i + 1}: ${toThousandSeparatorString(Number(n) || 0)}`}
+                />
+                <button
+                  type="button"
+                  className="btn batch-insert-btn"
+                  onClick={() => insertAfter(i)}
+                  title="Chèn số bên dưới"
+                  aria-label={`Chèn số bên dưới số ${i + 1}`}
+                >
+                  <Plus size={16} />
+                </button>
+                <button
+                  type="button"
+                  className="btn danger"
+                  onClick={() => removeAt(i)}
+                >
+                  Xóa
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <footer className="dialog-fullscreen-footer">
+          <button type="button" className="btn" onClick={addNumber}>
+            + Thêm số
+          </button>
+
+          {listenError && (
+            <p className="batch-listen-error" role="alert">
+              {listenError}
+            </p>
+          )}
+
+          <div className="dialog-footer dialog-footer-batch">
+            {listenAvailable && (
+              <>
+                <button
+                  type="button"
+                  className={`btn batch-listen-btn${speaking ? " speaking" : ""}`}
+                  onClick={toggleListen}
+                  disabled={numbers.every((n) => !n.trim())}
+                  title={
+                    speaking
+                      ? "Dừng đọc"
+                      : "Đọc lại danh sách số theo thứ tự (từng chữ số tiếng Việt)"
+                  }
+                >
+                  {speaking ? <Square size={16} /> : <Volume2 size={16} />}
+                </button>
+                <label className="batch-listen-speed" htmlFor="batch-listen-speed">
+                  <input
+                    id="batch-listen-speed"
+                    type="range"
+                    min={0.75}
+                    max={2}
+                    step={0.05}
+                    value={listenSpeed}
+                    disabled={speaking}
+                    onChange={(e) => {
+                      const rate = Number(e.target.value);
+                      setListenSpeed(rate);
+                      setNumberAudioPlaybackRate(rate);
+                    }}
+                  />
+                  <span className="batch-listen-speed-value">
+                    {listenSpeed.toFixed(2)}
+                  </span>
+                </label>
+              </>
+            )}
+            <div className="dialog-footer-batch-actions">
+              {showInsert && (
+                <button type="button" className="btn" onClick={submitInsert}>
+                  Chèn vào {insertAfterRowIndex! + 1}
+                </button>
+              )}
+              <button type="submit" className="btn primary">
+                OK
               </button>
             </div>
-          ))}
-        </div>
-
-        <button type="button" className="btn" onClick={addNumber}>
-          + Thêm số
-        </button>
-
-        {listenAvailable && (
-          <div className="batch-listen-panel">
-            <label className="batch-listen-speed" htmlFor="batch-listen-speed">
-              <span>Tốc độ đọc</span>
-              <input
-                id="batch-listen-speed"
-                type="range"
-                min={0.75}
-                max={2}
-                step={0.05}
-                value={listenSpeed}
-                disabled={speaking}
-                onChange={(e) => {
-                  const rate = Number(e.target.value);
-                  setListenSpeed(rate);
-                  setNumberAudioPlaybackRate(rate);
-                }}
-              />
-              <span className="batch-listen-speed-value">
-                {listenSpeed.toFixed(2)}×
-              </span>
-            </label>
-            <button
-              type="button"
-              className={`btn batch-listen-btn${speaking ? " speaking" : ""}`}
-              onClick={toggleListen}
-              disabled={numbers.every((n) => !n.trim())}
-              title={
-                speaking
-                  ? "Dừng đọc"
-                  : "Đọc lại danh sách số theo thứ tự (từng chữ số tiếng Việt)"
-              }
-            >
-              {speaking ? <Square size={16} /> : <Volume2 size={16} />}
-              {speaking ? "Dừng" : "Nghe lại"}
-            </button>
-            {listenError && (
-              <p className="batch-listen-error" role="alert">
-                {listenError}
-              </p>
-            )}
           </div>
-        )}
-
-        <div className="dialog-actions dialog-actions-spread">
-          {showInsert && (
-            <button
-              type="button"
-              className="btn"
-              onClick={submitInsert}
-            >
-              Chèn vào {insertAfterRowIndex! + 1}
-            </button>
-          )}
-          <div className="dialog-actions-end">
-            <button type="button" className="btn" onClick={onCancel}>
-              Hủy
-            </button>
-            <button type="submit" className="btn primary">
-              Xác nhận
-            </button>
-          </div>
-        </div>
+        </footer>
       </form>
     </Dialog>
   );

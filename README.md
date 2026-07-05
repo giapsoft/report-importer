@@ -37,6 +37,36 @@ Xóa luôn dữ liệu DB:
 docker compose down -v
 ```
 
+## Build lại từng service
+
+Chạy các lệnh sau từ thư mục gốc project.
+
+Chỉ frontend (sau khi sửa giao diện):
+
+```bash
+docker compose up --build -d frontend
+```
+
+Chỉ backend:
+
+```bash
+docker compose up --build -d backend
+```
+
+Chỉ build image, chưa khởi động lại container:
+
+```bash
+docker compose build frontend
+```
+
+Build xong rồi restart frontend:
+
+```bash
+docker compose build frontend && docker compose up -d frontend
+```
+
+Sau khi build frontend, mở lại [http://localhost:8080](http://localhost:8080). Nếu trình duyệt vẫn hiện bản cũ, thử hard refresh (Ctrl+F5).
+
 ## GitHub Pages
 
 Frontend build ra static files. GitHub Pages **không** chạy API/Postgres, nên cần trỏ `VITE_API_BASE` tới API public (nếu có), hoặc chỉ dùng bản local Docker để có đủ tính năng.
@@ -56,3 +86,4 @@ Thư mục `frontend/dist` deploy lên GitHub Pages.
 - `row.values` chỉ chứa ô Date + FlexNumber; SummaryColumn tính riêng
 - Cột chính (`primaryColumnIndex`) bắt buộc lúc tạo, không sửa sau
 - Splitter mặc định `"hết"`, lưu trong bảng `settings`
+ 

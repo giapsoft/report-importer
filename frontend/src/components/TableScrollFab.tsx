@@ -79,7 +79,6 @@ export function TableScrollFabButton({
       onClick={goTop ? onScrollToTop : onScrollToBottom}
     >
       {goTop ? <ChevronUp size={22} /> : <ChevronDown size={22} />}
-      <span>{goTop ? "Lên đầu" : "Xuống cuối"}</span>
     </button>
   );
 }
