@@ -107,7 +107,7 @@ async function preloadAll(ctx: AudioContext): Promise<void> {
   preloadPromise = (async () => {
     const loads: Promise<AudioBuffer>[] = [];
     for (let d = 0; d <= 9; d++) {
-      loads.push(loadBuffer(ctx, String(d), `${SOUND_BASE}${d}.mp3`));
+      loads.push(loadBuffer(ctx, String(d), `${SOUND_BASE}${d}.wav`));
     }
     loads.push(loadBuffer(ctx, "ting", `${SOUND_BASE}ting.wav`));
     await Promise.all(loads);
