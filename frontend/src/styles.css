@@ -536,15 +536,15 @@ button {
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 12px 16px;
-  padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  gap: 10px;
+  padding: 12px 16px 0;
   border-top: 1px solid var(--border);
   background: var(--surface);
 }
 
 .dialog-fullscreen-footer .dialog-footer {
   margin-top: 0;
+  padding-bottom: 0;
 }
 
 .field {
@@ -623,12 +623,6 @@ button {
   flex-wrap: nowrap;
   align-items: center;
   gap: 8px;
-}
-
-.dialog-footer-batch .batch-listen-speed {
-  flex: 1;
-  min-width: 72px;
-  max-width: none;
 }
 
 .dialog-footer-batch-actions {
@@ -715,56 +709,126 @@ button {
 
 .batch-numbers {
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
   gap: 8px;
+  align-content: flex-start;
 }
 
-.batch-number-row {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-.batch-number-row input {
-  flex: 1;
+.batch-number-chip {
+  display: inline-flex;
+  align-items: stretch;
+  max-width: 100%;
   border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 8px 10px;
+  border-radius: 999px;
+  background: #f8fafc;
+  overflow: hidden;
 }
 
-.batch-insert-btn {
-  flex-shrink: 0;
-  padding: 8px 10px;
+.batch-number-chip.selected {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.batch-number-chip.speaking {
+  box-shadow: 0 0 0 2px var(--primary);
+}
+
+.batch-number-chip.draft {
+  border-style: dashed;
+}
+
+.batch-number-chip-main {
+  border: none;
+  background: transparent;
+  padding: 8px 4px 8px 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
   min-width: 0;
+  text-align: left;
 }
 
-.batch-listen-speed {
+.batch-number-chip-delete {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  padding: 0 10px 0 2px;
+  color: var(--muted);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.batch-number-chip-delete:hover {
+  color: var(--danger);
+}
+
+.batch-numpad {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  width: 100%;
+  margin-top: 2px;
+  padding-top: 10px;
+  padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--border);
+}
+
+.batch-numpad-key {
+  min-height: 56px;
+  padding: 12px 8px;
+  font-size: 1.25rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: manipulation;
+}
+
+@media (pointer: coarse) {
+  .batch-numpad-key {
+    min-height: 64px;
+    font-size: 1.375rem;
+  }
+}
+
+.batch-numpad-enter {
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.batch-listen-speed-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 12px;
+  min-width: 44px;
+  flex-shrink: 0;
+}
+
+.batch-listen-group {
   display: flex;
   align-items: center;
   gap: 8px;
   flex: 1;
-  min-width: 120px;
-  max-width: 220px;
-  font-size: 0.8125rem;
+  min-width: 0;
 }
 
-.batch-listen-speed-label {
-  flex-shrink: 0;
-  color: var(--muted);
-  font-weight: 600;
-}
-
-.batch-listen-speed input[type="range"] {
+.batch-listen-group.speaking .batch-listen-stop {
   flex: 1;
   min-width: 0;
+  min-height: 44px;
+  justify-content: center;
+  gap: 8px;
+  font-weight: 700;
 }
 
 .batch-listen-speed-value {
-  min-width: 3.2rem;
-  text-align: right;
+  min-width: 2.8rem;
+  text-align: center;
   font-variant-numeric: tabular-nums;
-  color: var(--muted);
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .batch-listen-btn {
@@ -772,6 +836,8 @@ button {
   align-items: center;
   gap: 6px;
   flex-shrink: 0;
+  min-width: 88px;
+  justify-content: center;
 }
 
 .batch-listen-btn.speaking {

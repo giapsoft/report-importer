@@ -28,8 +28,9 @@ let preloadPromise: Promise<void> | null = null;
 /** Tốc độ phát (1 = bình thường). Giữ trong phiên, không lưu storage. */
 let playbackRate = 1;
 
-const MIN_PLAYBACK_RATE = 0.75;
-const MAX_PLAYBACK_RATE = 2;
+export const MIN_PLAYBACK_RATE = 0.75;
+export const MAX_PLAYBACK_RATE = 2;
+export const PLAYBACK_RATE_STEP = 0.05;
 const TING_GAIN = 1.35;
 
 export function getNumberAudioPlaybackRate(): number {
@@ -170,6 +171,10 @@ export function playNumberListAudio(
     onStart?: () => void;
     onEnd?: () => void;
     onError?: (message: string) => void;
+    /** Gọi trước khi đọc từng số (index trong `values` đã lọc). */
+    onItemStart?: (index: number) => void;
+    /** Bắt đầu đọc từ số thứ mấy (0-based, trong `values` đã lọc). */
+    startAtIndex?: number;
   },
 ): { stop: () => void } {
   const controller = new AbortController();
@@ -217,9 +222,15 @@ export function playNumberListAudio(
       if (signal.aborted) return;
 
       const ting = bufferCache.get("ting");
+      const startAt = Math.max(
+        0,
+        Math.min(options?.startAtIndex ?? 0, parts.length - 1),
+      );
 
-      for (let i = 0; i < parts.length; i++) {
+      for (let i = startAt; i < parts.length; i++) {
         if (signal.aborted) break;
+
+        options?.onItemStart?.(i);
 
         for (let j = 0; j < parts[i].length; j++) {
           if (signal.aborted) break;
@@ -244,6 +255,33 @@ export function playNumberListAudio(
   })();
 
   return { stop };
+}
+
+async function playCachedKeySound(
+  key: string,
+  options?: { gain?: number },
+): Promise<void> {
+  const ctx = await getAudioContext();
+  await preloadAll(ctx);
+  const buf = bufferCache.get(key);
+  if (!buf) return;
+  await playBuffer(ctx, buf, new AbortController().signal, options);
+}
+
+/** Phát âm một chữ số (bàn phím ảo). */
+export function playDigitKeySound(digit: string): void {
+  if (!/^[0-9]$/.test(digit) || !isAudioPlaybackSupported()) return;
+  void playCachedKeySound(digit).catch((err) => {
+    console.warn("Phát âm phím số thất bại", err);
+  });
+}
+
+/** Phát âm ting (Enter trên bàn phím ảo). */
+export function playTingKeySound(): void {
+  if (!isAudioPlaybackSupported()) return;
+  void playCachedKeySound("ting", { gain: TING_GAIN }).catch((err) => {
+    console.warn("Phát âm ting thất bại", err);
+  });
 }
 
 /** Xóa cache (tùy chọn, khi thoát app). */
