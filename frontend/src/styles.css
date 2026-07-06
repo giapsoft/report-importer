@@ -348,10 +348,44 @@ button {
   overflow: hidden;
 }
 
-.page-body-fill .table-wrap {
+.page-body-fill .table-scroll-area {
+  flex: 1;
+  min-height: 0;
+}
+
+.page-body-fill .table-scroll-area .table-wrap {
   flex: 1;
   min-height: 0;
   max-height: none;
+}
+
+.table-scroll-area {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.table-scroll-spacer {
+  flex-shrink: 0;
+  height: 80px;
+  pointer-events: none;
+}
+
+.table-scroll-fab {
+  position: absolute;
+  right: 12px;
+  bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  z-index: 5;
+}
+
+.table-scroll-fab.icon-btn {
+  background: var(--header);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.18);
+}
+
+.table-scroll-fab.icon-btn:active {
+  background: #1e293b;
 }
 
 .page-footer {

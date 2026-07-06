@@ -73,7 +73,7 @@ export function TableScrollFabButton({
   return (
     <button
       type="button"
-      className="icon-btn"
+      className="table-scroll-fab icon-btn"
       aria-label={goTop ? "Lăn lên đầu" : "Lăn xuống cuối"}
       title={goTop ? "Lăn lên đầu" : "Lăn xuống cuối"}
       onClick={goTop ? onScrollToTop : onScrollToBottom}

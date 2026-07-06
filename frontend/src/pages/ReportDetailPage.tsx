@@ -18,7 +18,7 @@ import {
   ACTION_LABELS,
   HEADER_DETAIL_ACTIONS,
 } from "@/domain/actions";
-import { getColumnSumDisplay, getRowDisplayString, isNumericColumn } from "@/domain/report";
+import { getColumnSumDisplay, getRowDisplayString, getSoleFlexNumberColumnIndex, isNumericColumn } from "@/domain/report";
 import {
   playNumberListAudio,
   unlockNumberAudio,
@@ -112,6 +112,16 @@ export function ReportDetailPage() {
     return () => resetDetailSelection();
   }, [id, resetDetailSelection]);
 
+  const soleFlexColumnIndex = useMemo(
+    () => (report ? getSoleFlexNumberColumnIndex(report) : null),
+    [report],
+  );
+
+  useEffect(() => {
+    if (soleFlexColumnIndex == null) return;
+    selectColumnIndex(soleFlexColumnIndex);
+  }, [id, soleFlexColumnIndex, selectColumnIndex]);
+
   useEffect(() => {
     return () => {
       stopSpeechRef.current?.();
@@ -198,8 +208,9 @@ export function ReportDetailPage() {
   };
 
   const selectedNumericColumn =
-    selectedColumnIndex >= 0 &&
-    isNumericColumn(report.columns[selectedColumnIndex]);
+    (selectedColumnIndex >= 0 &&
+      isNumericColumn(report.columns[selectedColumnIndex])) ||
+    soleFlexColumnIndex != null;
 
   const showListenRows =
     selectedNumericColumn && report.rows.length > 0;
@@ -235,8 +246,11 @@ export function ReportDetailPage() {
     stopSpeechRef.current?.();
   };
 
+  const listenColumnIndex =
+    selectedColumnIndex >= 0 ? selectedColumnIndex : soleFlexColumnIndex ?? -1;
+
   const startListenRows = () => {
-    if (!showListenRows) return;
+    if (!showListenRows || listenColumnIndex < 0) return;
 
     const startRow =
       selectedRowIndexes.length > 0
@@ -246,7 +260,7 @@ export function ReportDetailPage() {
       .slice(startRow)
       .map((row, offset) => ({
         rowIndex: startRow + offset,
-        value: getRowDisplayString(report, row, selectedColumnIndex)
+        value: getRowDisplayString(report, row, listenColumnIndex)
           .replace(/\./g, "")
           .trim(),
       }))
@@ -357,8 +371,9 @@ export function ReportDetailPage() {
       </header>
 
       <main className="page-body page-body-fill">
-        <div className="table-wrap" ref={tableScrollRef}>
-          <table className="report-table">
+        <div className="table-scroll-area">
+          <div className="table-wrap" ref={tableScrollRef}>
+            <table className="report-table">
             <thead>
               <tr>
                 <th
@@ -387,7 +402,16 @@ export function ReportDetailPage() {
                       ]
                         .filter(Boolean)
                         .join(" ")}
-                      onClick={() => toggleSelectedColumnIndex(index)}
+                      onClick={() => {
+                        if (
+                          soleFlexColumnIndex != null &&
+                          index === soleFlexColumnIndex &&
+                          selectedColumnIndex === index
+                        ) {
+                          return;
+                        }
+                        toggleSelectedColumnIndex(index);
+                      }}
                     >
                       <div className="col-header">
                         <span className="col-header-name">{col.name}</span>
@@ -453,6 +477,16 @@ export function ReportDetailPage() {
               )}
             </tbody>
           </table>
+          {tableCanScroll && (
+            <div className="table-scroll-spacer" aria-hidden="true" />
+          )}
+        </div>
+        <TableScrollFabButton
+          canScroll={tableCanScroll}
+          atBottom={tableAtBottom}
+          onScrollToTop={scrollTableToTop}
+          onScrollToBottom={scrollTableToBottom}
+        />
         </div>
       </main>
 
@@ -487,12 +521,6 @@ export function ReportDetailPage() {
               )}
           </div>
           <div className="actions-row-right">
-            <TableScrollFabButton
-              canScroll={tableCanScroll}
-              atBottom={tableAtBottom}
-              onScrollToTop={scrollTableToTop}
-              onScrollToBottom={scrollTableToBottom}
-            />
             {actions.includes("insertRow") && (
               <button
                 type="button"

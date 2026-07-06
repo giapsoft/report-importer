@@ -22,6 +22,17 @@ export function isNumericColumn(col: ReportColumn | null | undefined): boolean {
   return col?.type === "FlexNumber" || col?.type === "SummaryColumn";
 }
 
+/** Index cột FlexNumber duy nhất để nhập, hoặc null nếu không đúng 1 cột. */
+export function getSoleFlexNumberColumnIndex(report: Report): number | null {
+  let found: number | null = null;
+  for (let i = 0; i < report.columns.length; i++) {
+    if (report.columns[i].type !== "FlexNumber") continue;
+    if (found != null) return null;
+    found = i;
+  }
+  return found;
+}
+
 /** Map index cột (trong report.columns) → index trong row.values */
 export function columnIndexToValueIndex(
   columns: ReportColumn[],

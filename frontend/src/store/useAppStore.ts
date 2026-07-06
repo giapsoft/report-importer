@@ -4,6 +4,7 @@ import {
   createBatchRows,
   createDuplicateRow,
   getMetaString,
+  getSoleFlexNumberColumnIndex,
   mapSelectedDateCells,
   mapDateCellsFromRowToEnd,
   mapSelectedFlexCells,
@@ -550,10 +551,19 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   applyBatch: (reportId, numbers, date, insertAfterRowIndex = null) => {
+    const report = get().getReport(reportId);
+    if (!report || numbers.length === 0) return;
+
     const { selectedColumnIndex } = get();
-    if (selectedColumnIndex < 0 || numbers.length === 0) return;
+    const soleFlexIndex = getSoleFlexNumberColumnIndex(report);
+    const columnIndex =
+      soleFlexIndex != null
+        ? soleFlexIndex
+        : selectedColumnIndex;
+    if (columnIndex < 0) return;
+
     get().updateReport(reportId, (r) => {
-      const newRows = createBatchRows(r, selectedColumnIndex, numbers, date);
+      const newRows = createBatchRows(r, columnIndex, numbers, date);
       if (
         insertAfterRowIndex == null ||
         insertAfterRowIndex < 0 ||

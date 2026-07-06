@@ -1,4 +1,5 @@
 import type { DetailAction, Report } from "./types";
+import { getSoleFlexNumberColumnIndex } from "./report";
 
 /** Các action cố định trên hàng header (cùng nút sửa tên). */
 export const HEADER_DETAIL_ACTIONS: DetailAction[] = [
@@ -14,18 +15,19 @@ export function availableActions(
 ): DetailAction[] {
   const list: DetailAction[] = ["insertRow"];
 
-  const column =
+  const soleFlexIndex = getSoleFlexNumberColumnIndex(report);
+  const selectedColumn =
     selectedColumnIndex >= 0 ? report.columns[selectedColumnIndex] : null;
 
-  if (column?.type === "FlexNumber") {
+  if (selectedColumn?.type === "FlexNumber" || soleFlexIndex != null) {
     list.push("inputBatch");
   }
 
-  if (selectedRowIndexes.length === 0 || !column) {
+  if (selectedRowIndexes.length === 0 || !selectedColumn) {
     return list;
   }
 
-  if (column.type === "Date") {
+  if (selectedColumn.type === "Date") {
     list.push(
       "decreaseDateBelow",
       "decreaseDate",
@@ -34,7 +36,7 @@ export function availableActions(
       "increaseDateBelow",
     );
   }
-  if (column.type === "FlexNumber") {
+  if (selectedColumn.type === "FlexNumber") {
     list.push("removeZero", "updateOriginalValue", "addZero");
   }
 
