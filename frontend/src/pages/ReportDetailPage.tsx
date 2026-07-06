@@ -59,6 +59,7 @@ export function ReportDetailPage() {
   const splitter = useAppStore((s) => s.splitter);
   const selectedColumnIndex = useAppStore((s) => s.selectedColumnIndex);
   const selectedRowIndexes = useAppStore((s) => s.selectedRowIndexes);
+  const startShiftRowIndex = useAppStore((s) => s.startShiftRowIndex);
 
   const resetDetailSelection = useAppStore((s) => s.resetDetailSelection);
   const toggleSelectedColumnIndex = useAppStore((s) => s.toggleSelectedColumnIndex);
@@ -202,6 +203,28 @@ export function ReportDetailPage() {
 
   const showListenRows =
     selectedNumericColumn && report.rows.length > 0;
+
+  const getSttCellClass = (rowIndex: number): string => {
+    const classes = ["stt-cell"];
+    if (startShiftRowIndex < 0 || !selectedRowIndexes.includes(rowIndex)) {
+      return classes.join(" ");
+    }
+
+    const rangeStart = startShiftRowIndex;
+    if (selectedRowIndexes.length === 1) {
+      if (rowIndex === rangeStart) classes.push("stt-range-start");
+      return classes.join(" ");
+    }
+
+    const rangeEnd = selectedRowIndexes.reduce((far, i) =>
+      Math.abs(i - rangeStart) > Math.abs(far - rangeStart) ? i : far,
+    );
+    if (rowIndex === rangeStart) classes.push("stt-range-start");
+    if (rowIndex === rangeEnd && rangeEnd !== rangeStart) {
+      classes.push("stt-range-end");
+    }
+    return classes.join(" ");
+  };
 
   const finishListeningRows = () => {
     setSpeakingRows(false);
@@ -404,11 +427,11 @@ export function ReportDetailPage() {
                         .join(" ")}
                     >
                       <td
-                        className="stt-cell"
+                        className={getSttCellClass(rowIndex)}
                         onClick={() => toggleRowRange(rowIndex)}
                         title="Chọn dải dòng"
                       >
-                        {rowIndex + 1}
+                        <span className="stt-cell-value">{rowIndex + 1}</span>
                       </td>
                       {report.columns.map((_, colIndex) => (
                         <td

@@ -441,6 +441,29 @@ button {
   font-weight: 600;
 }
 
+.report-table td.stt-cell .stt-cell-value {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.75rem;
+  min-height: 1.75rem;
+  border-radius: 999px;
+}
+
+.report-table tr.row-selected td.stt-cell.stt-range-start .stt-cell-value {
+  background: var(--primary);
+  color: #fff;
+  font-weight: 800;
+  box-shadow: 0 0 0 2px #93c5fd;
+}
+
+.report-table tr.row-selected td.stt-cell.stt-range-end .stt-cell-value {
+  background: #1e40af;
+  color: #fff;
+  font-weight: 800;
+  box-shadow: 0 0 0 2px #93c5fd;
+}
+
 .report-table {
   border-collapse: separate;
   border-spacing: 0;
