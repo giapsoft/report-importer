@@ -9,7 +9,10 @@ import type { Report } from "./types";
 /** Định dạng số nguyên có phân cách hàng nghìn (Excel dùng token chuẩn #,##0). */
 const NUMBER_FORMAT = "#,##0";
 
-function sanitizeFileName(name: string): string {
+const XLSX_MIME =
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+
+export function sanitizeFileName(name: string): string {
   const cleaned = name
     .trim()
     .replace(/[<>:"/\\|?*\u0000-\u001f]/g, "_")
@@ -22,21 +25,32 @@ function sheetName(name: string): string {
   return (cleaned || "Bao cao").slice(0, 31);
 }
 
-/**
- * Tạo file Excel từ báo cáo.
- * Luôn có cột STT đầu tiên; chỉ export các cột trong columnIndexes (theo thứ tự chọn / thứ tự cột gốc).
- */
-export async function exportReportToExcel(
+function downloadBlob(blob: Blob, fileName: string): void {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function uniqueXlsxName(baseName: string, used: Map<string, number>): string {
+  const count = (used.get(baseName) ?? 0) + 1;
+  used.set(baseName, count);
+  if (count === 1) return `${baseName}.xlsx`;
+  return `${baseName} (${count}).xlsx`;
+}
+
+/** Tạo buffer Excel cho một báo cáo. */
+export async function buildReportExcelBuffer(
   report: Report,
   columnIndexes: number[],
-): Promise<void> {
+): Promise<ArrayBuffer> {
   const indexes = columnIndexes
     .filter((i) => i >= 0 && i < report.columns.length)
     .sort((a, b) => a - b);
-
-  if (indexes.length === 0) {
-    throw new Error("Chọn ít nhất một cột để export");
-  }
 
   const ExcelJS = (await import("exceljs")).default;
   const workbook = new ExcelJS.Workbook();
@@ -54,7 +68,6 @@ export async function exportReportToExcel(
     const row = report.rows[ri];
     const excelRow = sheet.addRow([]);
 
-    // Cột STT (cột 1)
     const sttCell = excelRow.getCell(1);
     sttCell.value = ri + 1;
     sttCell.alignment = { horizontal: "center" };
@@ -83,7 +96,6 @@ export async function exportReportToExcel(
         return;
       }
 
-      // SummaryColumn — giá trị số (tích các cột thành phần)
       const n = getSummaryValue(report, row, colIndex);
       cell.value = n;
       cell.numFmt = NUMBER_FORMAT;
@@ -91,23 +103,61 @@ export async function exportReportToExcel(
     });
   }
 
-  // Độ rộng cột vừa phải
   sheet.getColumn(1).width = 8;
   indexes.forEach((colIndex, offset) => {
     const nameLen = report.columns[colIndex].name.length;
     sheet.getColumn(offset + 2).width = Math.min(28, Math.max(12, nameLen + 4));
   });
 
-  const buffer = await workbook.xlsx.writeBuffer();
-  const blob = new Blob([buffer], {
-    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `${sanitizeFileName(report.name)}.xlsx`;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
+  return workbook.xlsx.writeBuffer() as Promise<ArrayBuffer>;
+}
+
+/**
+ * Tạo file Excel từ báo cáo.
+ * Luôn có cột STT đầu tiên; chỉ export các cột trong columnIndexes (theo thứ tự chọn / thứ tự cột gốc).
+ */
+export async function exportReportToExcel(
+  report: Report,
+  columnIndexes: number[],
+): Promise<void> {
+  const indexes = columnIndexes
+    .filter((i) => i >= 0 && i < report.columns.length)
+    .sort((a, b) => a - b);
+
+  if (indexes.length === 0) {
+    throw new Error("Chọn ít nhất một cột để export");
+  }
+
+  const buffer = await buildReportExcelBuffer(report, indexes);
+  downloadBlob(
+    new Blob([buffer], { type: XLSX_MIME }),
+    `${sanitizeFileName(report.name)}.xlsx`,
+  );
+}
+
+/** Export nhiều báo cáo (tất cả cột) vào một file zip. */
+export async function exportReportsToZip(
+  reports: Report[],
+  archiveBaseName = "bao-cao",
+): Promise<void> {
+  if (reports.length === 0) {
+    throw new Error("Không có báo cáo để export");
+  }
+
+  const JSZip = (await import("jszip")).default;
+  const zip = new JSZip();
+  const usedNames = new Map<string, number>();
+
+  for (const report of reports) {
+    const columnIndexes = report.columns.map((_, index) => index);
+    const buffer = await buildReportExcelBuffer(report, columnIndexes);
+    const entryName = uniqueXlsxName(
+      sanitizeFileName(report.name),
+      usedNames,
+    );
+    zip.file(entryName, buffer);
+  }
+
+  const zipBlob = await zip.generateAsync({ type: "blob" });
+  downloadBlob(zipBlob, `${sanitizeFileName(archiveBaseName)}.zip`);
 }

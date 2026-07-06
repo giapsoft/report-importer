@@ -41,6 +41,7 @@ interface AppState {
   deleteSelectedReports: () => void;
   deleteReports: (ids: string[]) => void;
   toggleReportSelection: (id: string) => void;
+  toggleSelectAllReports: (ids: string[]) => void;
   clearReportSelection: () => void;
   createSeason: (name: string) => Promise<void>;
   renameSeason: (id: number, name: string) => void;
@@ -214,6 +215,22 @@ export const useAppStore = create<AppState>((set, get) => ({
         ? s.selectedReportIds.filter((x) => x !== id)
         : [...s.selectedReportIds, id],
     }));
+  },
+
+  toggleSelectAllReports: (ids) => {
+    if (ids.length === 0) return;
+    set((s) => {
+      const allSelected = ids.every((id) => s.selectedReportIds.includes(id));
+      if (allSelected) {
+        const idSet = new Set(ids);
+        return {
+          selectedReportIds: s.selectedReportIds.filter((id) => !idSet.has(id)),
+        };
+      }
+      return {
+        selectedReportIds: [...new Set([...s.selectedReportIds, ...ids])],
+      };
+    });
   },
 
   clearReportSelection: () => set({ selectedReportIds: [] }),

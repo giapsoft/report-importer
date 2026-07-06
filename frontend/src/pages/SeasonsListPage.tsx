@@ -34,8 +34,10 @@ export function SeasonsListPage() {
   const [showAdd, setShowAdd] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
+  const hasListItems = dbItems.length > 0 || unsetCount > 0;
+
   return (
-    <div className="app-shell">
+    <div className="app-shell page-with-fab">
       <header className="page-header">
         <div className="header-row">
           <div className="left">
@@ -44,14 +46,6 @@ export function SeasonsListPage() {
               {seasons.length} mùa · {formatAppVersion()}
             </div>
           </div>
-          <button
-            type="button"
-            className="icon-btn"
-            aria-label="Thêm mùa"
-            onClick={() => setShowAdd(true)}
-          >
-            <Plus size={22} />
-          </button>
           <button
             type="button"
             className="icon-btn danger"
@@ -65,7 +59,7 @@ export function SeasonsListPage() {
       </header>
 
       <main className="page-body">
-        {dbItems.length === 0 && unsetCount === 0 ? (
+        {!hasListItems ? (
           <div className="empty">Chưa có mùa nào. Nhấn + để tạo mới.</div>
         ) : (
           <div className="list">
@@ -104,7 +98,7 @@ export function SeasonsListPage() {
                   background: "transparent",
                   padding: 0,
                   width: "100%",
-                  marginLeft: 28,
+                  marginLeft: dbItems.length > 0 ? 28 : 0,
                 }}
                 onClick={() => navigate(`/seasons/${UNSET_SEASON_ID}`)}
               >
@@ -114,9 +108,20 @@ export function SeasonsListPage() {
                 </p>
               </button>
             </div>
+            <div className="list-scroll-spacer" aria-hidden="true" />
           </div>
         )}
       </main>
+
+      <button
+        type="button"
+        className="page-fab"
+        aria-label="Thêm mùa"
+        title="Thêm mùa"
+        onClick={() => setShowAdd(true)}
+      >
+        <Plus size={26} strokeWidth={2.5} />
+      </button>
 
       {showAdd && (
         <AddSeasonDialog
