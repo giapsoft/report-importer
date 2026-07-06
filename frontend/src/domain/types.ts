@@ -47,7 +47,6 @@ export interface ConfirmBatchResult {
 }
 
 export type DetailAction =
-  | "insertRow"
   | "deleteRows"
   | "exportExcel"
   | "increaseDate"

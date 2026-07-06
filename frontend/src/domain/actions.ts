@@ -13,7 +13,7 @@ export function availableActions(
   selectedColumnIndex: number,
   selectedRowIndexes: number[],
 ): DetailAction[] {
-  const list: DetailAction[] = ["insertRow"];
+  const list: DetailAction[] = [];
 
   const soleFlexIndex = getSoleFlexNumberColumnIndex(report);
   const selectedColumn =
@@ -44,7 +44,6 @@ export function availableActions(
 }
 
 export const ACTION_LABELS: Record<DetailAction, string> = {
-  insertRow: "Nhân bản dòng",
   deleteRows: "Xóa dòng",
   exportExcel: "Export Excel",
   increaseDate: "Ngày +1",

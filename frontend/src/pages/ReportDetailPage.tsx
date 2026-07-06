@@ -5,7 +5,6 @@ import {
   CalendarPlus,
   CalendarMinus,
   CalendarRange,
-  CopyPlus,
   Pencil,
   Trash2,
   Upload,
@@ -70,7 +69,6 @@ export function ReportDetailPage() {
   const selectSingleRow = useAppStore((s) => s.selectSingleRow);
   const setSplitter = useAppStore((s) => s.setSplitter);
   const renameReport = useAppStore((s) => s.renameReport);
-  const insertRow = useAppStore((s) => s.insertRow);
   const deleteSelectedRows = useAppStore((s) => s.deleteSelectedRows);
   const addZero = useAppStore((s) => s.addZero);
   const removeZero = useAppStore((s) => s.removeZero);
@@ -166,9 +164,6 @@ export function ReportDetailPage() {
 
   const runAction = (action: DetailAction) => {
     switch (action) {
-      case "insertRow":
-        insertRow(report.id);
-        break;
       case "deleteRows":
         setDeleteRowsOpen(true);
         break;
@@ -431,7 +426,7 @@ export function ReportDetailPage() {
                     colSpan={report.columns.length + 1}
                     style={{ textAlign: "center", color: "var(--muted)" }}
                   >
-                    Chưa có dòng. Dùng Nhân bản dòng hoặc Nhập hàng loạt.
+                    Chưa có dòng. Dùng Nhập hàng loạt.
                   </td>
                 </tr>
               ) : (
@@ -494,9 +489,7 @@ export function ReportDetailPage() {
         <div className="actions-row">
           <div className="actions-row-left">
             {actions
-              .filter(
-                (action) => action !== "inputBatch" && action !== "insertRow",
-              )
+              .filter((action) => action !== "inputBatch")
               .map((action) =>
                 HOLD_REPEAT_ACTIONS.has(action) ? (
                   <HoldIconButton
@@ -521,17 +514,6 @@ export function ReportDetailPage() {
               )}
           </div>
           <div className="actions-row-right">
-            {actions.includes("insertRow") && (
-              <button
-                type="button"
-                className="icon-btn"
-                aria-label={ACTION_LABELS.insertRow}
-                title={ACTION_LABELS.insertRow}
-                onClick={() => runAction("insertRow")}
-              >
-                <ActionIcon action="insertRow" />
-              </button>
-            )}
             {actions.includes("inputBatch") && (
               <button
                 type="button"
@@ -706,8 +688,6 @@ export function ReportDetailPage() {
 function ActionIcon({ action }: { action: DetailAction }) {
   const size = 18;
   switch (action) {
-    case "insertRow":
-      return <CopyPlus size={size} />;
     case "deleteRows":
       return <Trash2 size={size} />;
     case "exportExcel":

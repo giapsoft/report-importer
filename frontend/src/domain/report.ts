@@ -141,29 +141,6 @@ export function createEmptyRow(columns: ReportColumn[], dateOverride?: string | 
   return { values };
 }
 
-/** Dòng mới khi nhân bản: FlexNumber trống; chỉ copy các cột Date từ dòng nguồn. */
-export function createDuplicateRow(
-  columns: ReportColumn[],
-  source: ReportRow | null,
-): ReportRow {
-  const values: CellValue[] = [];
-  for (let ci = 0; ci < columns.length; ci++) {
-    const col = columns[ci];
-    if (col.type === "Date") {
-      let value = todayIso();
-      if (source) {
-        const vi = columnIndexToValueIndex(columns, ci);
-        const cell = source.values[vi];
-        if (cell?.kind === "Date") value = cell.value;
-      }
-      values.push({ kind: "Date", value });
-    } else if (col.type === "FlexNumber") {
-      values.push({ kind: "FlexNumber", originalValue: 0, multiplier: 1 });
-    }
-  }
-  return { values };
-}
-
 export function createBatchRows(
   report: Report,
   selectedColumnIndex: number,

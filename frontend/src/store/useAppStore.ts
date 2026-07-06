@@ -2,7 +2,6 @@ import { create } from "zustand";
 import { api } from "@/api/client";
 import {
   createBatchRows,
-  createDuplicateRow,
   getMetaString,
   getSoleFlexNumberColumnIndex,
   mapSelectedDateCells,
@@ -69,7 +68,6 @@ interface AppState {
   clearRowSelection: () => void;
   /** Chọn đúng một dòng (dùng khi đọc số theo hàng). */
   selectSingleRow: (rowIndex: number) => void;
-  insertRow: (reportId: string) => void;
   deleteSelectedRows: (reportId: string) => void;
   addZero: (reportId: string) => void;
   removeZero: (reportId: string) => void;
@@ -409,34 +407,6 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   selectSingleRow: (rowIndex) =>
     set({ selectedRowIndexes: [rowIndex], startShiftRowIndex: -1 }),
-
-  insertRow: (reportId) => {
-    get().updateReport(reportId, (r) => {
-      const selected = get().selectedRowIndexes;
-      // Chèn ngay dưới dòng được chọn (hoặc cuối danh sách)
-      const insertAt =
-        selected.length > 0 ? Math.max(...selected) + 1 : r.rows.length;
-      // Nhân bản: dòng trống, chỉ giữ ngày từ dòng ngay phía trên (nếu có)
-      const source = insertAt > 0 ? r.rows[insertAt - 1] : null;
-      const row = createDuplicateRow(r.columns, source);
-      const rows = [...r.rows];
-      rows.splice(insertAt, 0, row);
-      return { ...r, rows };
-    });
-    // giữ selection, cập nhật index sau khi chèn
-    set((s) => {
-      const insertAt =
-        s.selectedRowIndexes.length > 0
-          ? Math.max(...s.selectedRowIndexes) + 1
-          : -1;
-      if (insertAt < 0) return s;
-      return {
-        selectedRowIndexes: s.selectedRowIndexes.map((i) =>
-          i >= insertAt ? i + 1 : i,
-        ),
-      };
-    });
-  },
 
   deleteSelectedRows: (reportId) => {
     const selected = new Set(get().selectedRowIndexes);
