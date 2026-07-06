@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { ReportDetailPage } from "@/pages/ReportDetailPage";
 import { ReportListPage } from "@/pages/ReportListPage";
+import { SeasonsListPage } from "@/pages/SeasonsListPage";
 import { useAppStore } from "@/store/useAppStore";
 
 export function App() {
@@ -27,7 +28,8 @@ export function App() {
 
   return (
     <Routes>
-      <Route path="/" element={<ReportListPage />} />
+      <Route path="/" element={<SeasonsListPage />} />
+      <Route path="/seasons/:seasonId" element={<ReportListPage />} />
       <Route path="/reports/:id" element={<ReportDetailPage />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

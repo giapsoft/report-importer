@@ -12,15 +12,18 @@ import {
   maxDateInSelectedRows,
   newReportId,
 } from "@/domain/report";
-import type { Report, ReportColumn, ReportRow } from "@/domain/types";
+import type { Report, ReportColumn, ReportRow, Season } from "@/domain/types";
+import { isUnsetSeasonId } from "@/domain/season";
 import { todayIso } from "@/domain/format";
 
 interface AppState {
   ready: boolean;
   loadError: string | null;
   splitter: string;
+  seasons: Season[];
   reports: Report[];
   selectedReportIds: string[];
+  selectedSeasonIds: number[];
 
   // detail selection (per session, not persisted)
   selectedColumnIndex: number;
@@ -29,10 +32,22 @@ interface AppState {
 
   hydrate: () => Promise<void>;
   setSplitter: (splitter: string) => void;
-  createReport: (name: string, columns: ReportColumn[], primaryColumnIndex: number) => void;
+  createReport: (
+    name: string,
+    columns: ReportColumn[],
+    primaryColumnIndex: number,
+    seasonId: number | null,
+  ) => void;
   deleteSelectedReports: () => void;
+  deleteReports: (ids: string[]) => void;
   toggleReportSelection: (id: string) => void;
   clearReportSelection: () => void;
+  createSeason: (name: string) => Promise<void>;
+  renameSeason: (id: number, name: string) => void;
+  deleteSelectedSeasons: () => void;
+  toggleSeasonSelection: (id: number) => void;
+  clearSeasonSelection: () => void;
+  moveReportsToSeason: (reportIds: string[], seasonId: number | null) => void;
   renameReport: (id: string, name: string) => void;
   updateReport: (id: string, updater: (r: Report) => Report) => void;
   getReport: (id: string) => Report | undefined;
@@ -110,26 +125,44 @@ function sortReports(reports: Report[]): Report[] {
   );
 }
 
+export function reportsForSeason(
+  reports: Report[],
+  seasonId: number,
+): Report[] {
+  if (isUnsetSeasonId(seasonId)) {
+    return sortReports(reports.filter((r) => r.seasonId == null));
+  }
+  return sortReports(reports.filter((r) => r.seasonId === seasonId));
+}
+
+export function unsetReportCount(reports: Report[]): number {
+  return reports.filter((r) => r.seasonId == null).length;
+}
+
 export const useAppStore = create<AppState>((set, get) => ({
   ready: false,
   loadError: null,
   splitter: "hết",
+  seasons: [],
   reports: [],
   selectedReportIds: [],
+  selectedSeasonIds: [],
   selectedColumnIndex: -1,
   startShiftRowIndex: -1,
   selectedRowIndexes: [],
 
   hydrate: async () => {
     try {
-      const [settings, reports] = await Promise.all([
+      const [settings, seasons, reports] = await Promise.all([
         api.getSettings(),
+        api.listSeasons(),
         api.listReports(),
       ]);
       set({
         ready: true,
         loadError: null,
         splitter: settings.splitter || "hết",
+        seasons,
         reports: sortReports(reports),
       });
     } catch (e) {
@@ -145,13 +178,14 @@ export const useAppStore = create<AppState>((set, get) => ({
     scheduleSettingsPersist(splitter);
   },
 
-  createReport: (name, columns, primaryColumnIndex) => {
+  createReport: (name, columns, primaryColumnIndex, seasonId) => {
     const report: Report = {
       id: newReportId(),
       name: name.trim(),
       columns,
       primaryColumnIndex,
       rows: [],
+      seasonId,
       updatedAt: new Date().toISOString(),
     };
     set((s) => ({ reports: [report, ...s.reports] }));
@@ -160,10 +194,14 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   deleteSelectedReports: () => {
     const ids = get().selectedReportIds;
+    get().deleteReports(ids);
+  },
+
+  deleteReports: (ids: string[]) => {
     if (ids.length === 0) return;
     set((s) => ({
       reports: s.reports.filter((r) => !ids.includes(r.id)),
-      selectedReportIds: [],
+      selectedReportIds: s.selectedReportIds.filter((id) => !ids.includes(id)),
     }));
     api.deleteReports(ids).catch((err) => {
       console.error("Xóa báo cáo thất bại", err);
@@ -179,6 +217,74 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   clearReportSelection: () => set({ selectedReportIds: [] }),
+
+  createSeason: async (name) => {
+    const season = await api.createSeason(name);
+    set((s) => ({ seasons: [...s.seasons, season] }));
+  },
+
+  renameSeason: (id, name) => {
+    const trimmed = name.trim();
+    set((s) => ({
+      seasons: s.seasons.map((season) =>
+        season.id === id ? { ...season, name: trimmed } : season,
+      ),
+    }));
+    api.renameSeason(id, trimmed).catch((err) => {
+      console.error("Đổi tên mùa thất bại", err);
+    });
+  },
+
+  deleteSelectedSeasons: () => {
+    const ids = get().selectedSeasonIds;
+    if (ids.length === 0) return;
+    set((s) => ({
+      seasons: s.seasons.filter((season) => !ids.includes(season.id)),
+      reports: s.reports.map((report) =>
+        report.seasonId != null && ids.includes(report.seasonId)
+          ? { ...report, seasonId: null }
+          : report,
+      ),
+      selectedSeasonIds: [],
+    }));
+    api.deleteSeasons(ids).catch((err) => {
+      console.error("Xóa mùa thất bại", err);
+    });
+  },
+
+  toggleSeasonSelection: (id) => {
+    set((s) => ({
+      selectedSeasonIds: s.selectedSeasonIds.includes(id)
+        ? s.selectedSeasonIds.filter((x) => x !== id)
+        : [...s.selectedSeasonIds, id],
+    }));
+  },
+
+  clearSeasonSelection: () => set({ selectedSeasonIds: [] }),
+
+  moveReportsToSeason: (reportIds, seasonId) => {
+    if (reportIds.length === 0) return;
+    const idSet = new Set(reportIds);
+    set((s) => {
+      const reports = s.reports.map((report) => {
+        if (!idSet.has(report.id)) return report;
+        const next = {
+          ...report,
+          seasonId,
+          updatedAt: new Date().toISOString(),
+        };
+        scheduleReportPersist(next);
+        return next;
+      });
+      return {
+        reports: sortReports(reports),
+        selectedReportIds: s.selectedReportIds.filter((id) => !idSet.has(id)),
+      };
+    });
+    api.moveReportsToSeason(reportIds, seasonId).catch((err) => {
+      console.error("Đổi mùa báo cáo thất bại", err);
+    });
+  },
 
   renameReport: (id, name) => {
     get().updateReport(id, (r) => ({ ...r, name: name.trim() }));

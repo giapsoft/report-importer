@@ -31,7 +31,14 @@ export interface Report {
   columns: ReportColumn[];
   primaryColumnIndex: number;
   rows: ReportRow[];
+  seasonId?: number | null;
   updatedAt?: string;
+}
+
+export interface Season {
+  id: number;
+  name: string;
+  reportCount?: number;
 }
 
 export interface ConfirmBatchResult {

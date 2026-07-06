@@ -1,35 +1,120 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { FileSpreadsheet, Plus, Trash2 } from "lucide-react";
+import { useMemo, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import {
+  ArrowLeft,
+  ArrowLeftRight,
+  FileSpreadsheet,
+  Plus,
+  Trash2,
+} from "lucide-react";
 import { AddReportDialog } from "@/components/AddReportDialog";
+import { ChangeSeasonDialog } from "@/components/ChangeSeasonDialog";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { ExportReportDialog } from "@/components/ExportReportDialog";
+import { RenameSeasonDialog } from "@/components/RenameSeasonDialog";
 import type { Report } from "@/domain/types";
 import { formatAppVersion } from "@/domain/appVersion";
-import { reportMeta, useAppStore } from "@/store/useAppStore";
+import {
+  isUnsetSeasonId,
+  seasonDisplayName,
+} from "@/domain/season";
+import { reportMeta, reportsForSeason, useAppStore } from "@/store/useAppStore";
 
 export function ReportListPage() {
   const navigate = useNavigate();
-  const reports = useAppStore((s) => s.reports);
+  const { seasonId: seasonIdParam = "" } = useParams();
+  const seasonId = Number(seasonIdParam);
+  const seasonIdValid =
+    seasonIdParam !== "" && Number.isInteger(seasonId) && seasonId >= 0;
+
+  const allReports = useAppStore((s) => s.reports);
+  const seasons = useAppStore((s) => s.seasons);
   const selectedReportIds = useAppStore((s) => s.selectedReportIds);
   const toggleReportSelection = useAppStore((s) => s.toggleReportSelection);
   const createReport = useAppStore((s) => s.createReport);
-  const deleteSelectedReports = useAppStore((s) => s.deleteSelectedReports);
+  const deleteReports = useAppStore((s) => s.deleteReports);
+  const moveReportsToSeason = useAppStore((s) => s.moveReportsToSeason);
+  const renameSeason = useAppStore((s) => s.renameSeason);
+
+  const reports = useMemo(
+    () => (seasonIdValid ? reportsForSeason(allReports, seasonId) : []),
+    [allReports, seasonId, seasonIdValid],
+  );
+
+  const selectedInSeason = useMemo(
+    () => selectedReportIds.filter((id) => reports.some((r) => r.id === id)),
+    [selectedReportIds, reports],
+  );
+
+  const seasonName = seasonIdValid
+    ? seasonDisplayName(seasonId, seasons)
+    : "";
+
+  const createSeasonId = seasonIdValid && !isUnsetSeasonId(seasonId)
+    ? seasonId
+    : null;
+
+  const canRenameSeason = seasonIdValid && !isUnsetSeasonId(seasonId);
 
   const [showAdd, setShowAdd] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showChangeSeason, setShowChangeSeason] = useState(false);
+  const [showRenameSeason, setShowRenameSeason] = useState(false);
   const [exportReport, setExportReport] = useState<Report | null>(null);
+
+  if (!seasonIdValid) {
+    return (
+      <div className="app-shell">
+        <main className="page-body">
+          <div className="empty">Không tìm thấy mùa.</div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="app-shell">
       <header className="page-header">
         <div className="header-row">
-          <div className="left">
-            <h1>Quản lý báo cáo</h1>
-            <div className="meta">
-              {reports.length} báo cáo · {formatAppVersion()}
+          <button
+            type="button"
+            className="icon-btn page-back-btn"
+            aria-label="Về danh sách mùa"
+            onClick={() => navigate("/")}
+          >
+            <ArrowLeft size={20} />
+          </button>
+          {canRenameSeason ? (
+            <button
+              type="button"
+              className="left header-title-btn"
+              aria-label="Sửa tên mùa"
+              title="Sửa tên mùa"
+              onClick={() => setShowRenameSeason(true)}
+            >
+              <h1>Mùa {seasonName}</h1>
+              <div className="meta">
+                {reports.length} báo cáo · {formatAppVersion()}
+              </div>
+            </button>
+          ) : (
+            <div className="left">
+              <h1>Mùa {seasonName}</h1>
+              <div className="meta">
+                {reports.length} báo cáo · {formatAppVersion()}
+              </div>
             </div>
-          </div>
+          )}
+          <button
+            type="button"
+            className="icon-btn"
+            aria-label="Đổi mùa cho báo cáo đã chọn"
+            title="Đổi mùa"
+            disabled={selectedInSeason.length === 0}
+            onClick={() => setShowChangeSeason(true)}
+          >
+            <ArrowLeftRight size={20} />
+          </button>
           <button
             type="button"
             className="icon-btn"
@@ -42,7 +127,7 @@ export function ReportListPage() {
             type="button"
             className="icon-btn danger"
             aria-label="Xóa báo cáo đã chọn"
-            disabled={selectedReportIds.length === 0}
+            disabled={selectedInSeason.length === 0}
             onClick={() => setShowDeleteConfirm(true)}
           >
             <Trash2 size={20} />
@@ -96,7 +181,7 @@ export function ReportListPage() {
         <AddReportDialog
           onCancel={() => setShowAdd(false)}
           onCreate={(name, columns, primaryColumnIndex) => {
-            createReport(name, columns, primaryColumnIndex);
+            createReport(name, columns, primaryColumnIndex, createSeasonId);
             setShowAdd(false);
           }}
         />
@@ -105,12 +190,36 @@ export function ReportListPage() {
       {showDeleteConfirm && (
         <ConfirmDialog
           title="Xóa báo cáo"
-          message={`Xóa ${selectedReportIds.length} báo cáo đã chọn?`}
+          message={`Xóa ${selectedInSeason.length} báo cáo đã chọn?`}
           danger
           onCancel={() => setShowDeleteConfirm(false)}
           onConfirm={() => {
-            deleteSelectedReports();
+            deleteReports(selectedInSeason);
             setShowDeleteConfirm(false);
+          }}
+        />
+      )}
+
+      {showChangeSeason && (
+        <ChangeSeasonDialog
+          seasons={seasons}
+          currentSeasonId={seasonId}
+          reportCount={selectedInSeason.length}
+          onCancel={() => setShowChangeSeason(false)}
+          onConfirm={(targetSeasonId) => {
+            moveReportsToSeason(selectedInSeason, targetSeasonId);
+            setShowChangeSeason(false);
+          }}
+        />
+      )}
+
+      {showRenameSeason && canRenameSeason && (
+        <RenameSeasonDialog
+          initialName={seasonName}
+          onCancel={() => setShowRenameSeason(false)}
+          onSave={(name) => {
+            renameSeason(seasonId, name);
+            setShowRenameSeason(false);
           }}
         />
       )}

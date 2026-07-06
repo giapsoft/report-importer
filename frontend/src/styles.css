@@ -499,8 +499,8 @@ button {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 16px 16px 12px;
-  padding-top: calc(16px + env(safe-area-inset-top, 0px));
+  padding: 8px 12px;
+  padding-top: calc(8px + env(safe-area-inset-top, 0px));
   border-bottom: 1px solid var(--border);
 }
 
@@ -508,10 +508,27 @@ button {
   margin: 0;
   flex: 1;
   min-width: 0;
+  font-size: 1rem;
+  line-height: 1.3;
 }
 
-.dialog-fullscreen-header-action {
+.dialog-fullscreen-header-action,
+.dialog-fullscreen-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   flex-shrink: 0;
+  min-width: 0;
+}
+
+.dialog-fullscreen-header-actions .batch-listen-group {
+  flex: 1;
+  min-width: 0;
+}
+
+.dialog-fullscreen-header-actions .batch-listen-group.speaking .batch-listen-stop {
+  flex: 1;
+  min-width: 0;
 }
 
 .dialog-fullscreen-form {
@@ -630,6 +647,13 @@ button {
   gap: 8px;
 }
 
+.dialog-footer-batch-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
 .dialog-footer-batch-actions {
   display: flex;
   align-items: center;
@@ -662,6 +686,48 @@ button {
 .btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 8px 10px;
+  min-width: 40px;
+}
+
+.btn-icon:has(svg:only-child) {
+  padding: 8px;
+}
+
+.btn-icon-label {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  min-width: 1ch;
+}
+
+.season-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.season-picker-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #f8fafc;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.season-picker-item input {
+  flex-shrink: 0;
 }
 
 .column-list {
@@ -768,12 +834,15 @@ button {
 .batch-numpad {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-  width: 100%;
+  gap: 1px;
+  background: #cbd5e1;
+  width: calc(100% + 32px);
+  margin-left: -16px;
+  margin-right: -16px;
   margin-top: 2px;
-  padding-top: 10px;
+  padding-top: 0;
   padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
-  border-top: 1px solid var(--border);
+  border-top: 1px solid #cbd5e1;
 }
 
 .batch-numpad-key {
@@ -785,6 +854,14 @@ button {
   align-items: center;
   justify-content: center;
   touch-action: manipulation;
+  border-radius: 0;
+  border: none;
+  margin: 0;
+  background: var(--surface);
+}
+
+.btn.batch-numpad-key {
+  background: var(--surface);
 }
 
 @media (pointer: coarse) {
@@ -797,6 +874,10 @@ button {
 .batch-numpad-enter {
   background: var(--primary-soft);
   color: var(--primary);
+}
+
+.btn.batch-numpad-enter {
+  background: var(--primary-soft);
 }
 
 .batch-listen-speed-btn {
@@ -826,7 +907,7 @@ button {
 }
 
 .batch-listen-speed-value {
-  min-width: 2.8rem;
+  min-width: 2.2rem;
   text-align: center;
   font-variant-numeric: tabular-nums;
   font-weight: 700;
@@ -835,10 +916,15 @@ button {
 .batch-listen-btn {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   flex-shrink: 0;
-  min-width: 88px;
   justify-content: center;
+}
+
+.btn.batch-listen-btn {
+  padding-left: 4px;
+  padding-right: 4px;
+  min-width: 0;
 }
 
 .batch-listen-btn.speaking {

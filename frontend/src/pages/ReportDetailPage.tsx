@@ -25,6 +25,7 @@ import {
 } from "@/domain/numberAudio";
 import { stringToNumber } from "@/domain/stringToNumber";
 import type { DetailAction } from "@/domain/types";
+import { seasonRouteId } from "@/domain/season";
 
 const HOLD_REPEAT_ACTIONS = new Set<DetailAction>([
   "increaseDate",
@@ -53,6 +54,8 @@ export function ReportDetailPage() {
   const { id = "" } = useParams();
   const navigate = useNavigate();
   const report = useAppStore((s) => s.reports.find((r) => r.id === id));
+  const backToSeasonList = () =>
+    navigate(`/seasons/${seasonRouteId(report?.seasonId)}`);
   const splitter = useAppStore((s) => s.splitter);
   const selectedColumnIndex = useAppStore((s) => s.selectedColumnIndex);
   const selectedRowIndexes = useAppStore((s) => s.selectedRowIndexes);
@@ -136,7 +139,7 @@ export function ReportDetailPage() {
             <button
               type="button"
               className="icon-btn"
-              onClick={() => navigate("/")}
+              onClick={backToSeasonList}
               aria-label="Quay lại"
             >
               <ArrowLeft size={20} />
@@ -272,7 +275,7 @@ export function ReportDetailPage() {
               <button
                 type="button"
                 className="icon-btn"
-                onClick={() => navigate("/")}
+                onClick={backToSeasonList}
                 aria-label="Quay lại"
               >
                 <ArrowLeft size={20} />

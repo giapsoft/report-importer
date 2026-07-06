@@ -7,6 +7,9 @@ import {
   Trash2,
   Delete,
   CornerDownLeft,
+  X,
+  ArrowDownToLine,
+  ListPlus,
 } from "lucide-react";
 import { toThousandSeparatorString } from "@/domain/format";
 import {
@@ -22,6 +25,7 @@ import {
   unlockNumberAudio,
 } from "@/domain/numberAudio";
 import { formSubmit } from "@/utils/enterSubmit";
+import { useHoldRepeat } from "@/hooks/useHoldRepeat";
 import { Dialog } from "./Dialog";
 import { DateStepper } from "./DateStepper";
 
@@ -98,7 +102,16 @@ export function ConfirmBatchDialog({
     });
   };
 
+  const stopListening = () => {
+    keepListenSelectionRef.current = true;
+    stopSpeechRef.current?.();
+  };
+
   const appendDigit = (digit: string) => {
+    if (speaking) {
+      stopListening();
+      return;
+    }
     unlockNumberAudio();
     playDigitKeySound(digit);
     if (selectedIndex !== null) {
@@ -160,8 +173,7 @@ export function ConfirmBatchDialog({
 
   const toggleListen = () => {
     if (speaking) {
-      keepListenSelectionRef.current = true;
-      stopSpeechRef.current?.();
+      stopListening();
       return;
     }
 
@@ -222,14 +234,70 @@ export function ConfirmBatchDialog({
   const showInsert =
     insertAfterRowIndex != null && insertAfterRowIndex >= 0;
 
+  const backspaceHold = useHoldRepeat(backspaceInput);
+
+  const listenControls = listenAvailable && (
+    <div className={`batch-listen-group${speaking ? " speaking" : ""}`}>
+      {!speaking && (
+        <>
+          <button
+            type="button"
+            className="btn batch-listen-speed-btn"
+            onClick={() => adjustListenSpeed(-PLAYBACK_RATE_STEP)}
+            disabled={listenSpeed <= MIN_PLAYBACK_RATE + 1e-9}
+            title="Giảm tốc độ đọc"
+            aria-label="Giảm tốc độ đọc"
+          >
+            <Minus size={16} />
+          </button>
+          <button
+            type="button"
+            className="btn batch-listen-btn"
+            onClick={toggleListen}
+            disabled={numbers.every((n) => !n.trim())}
+            title="Đọc lại danh sách số theo thứ tự (từng chữ số tiếng Việt)"
+          >
+            <Volume2 size={16} />
+            <span className="batch-listen-speed-value">
+              {listenSpeed.toFixed(2)}
+            </span>
+          </button>
+          <button
+            type="button"
+            className="btn batch-listen-speed-btn"
+            onClick={() => adjustListenSpeed(PLAYBACK_RATE_STEP)}
+            disabled={listenSpeed >= MAX_PLAYBACK_RATE - 1e-9}
+            title="Tăng tốc độ đọc"
+            aria-label="Tăng tốc độ đọc"
+          >
+            <Plus size={16} />
+          </button>
+        </>
+      )}
+      {speaking && (
+        <button
+          type="button"
+          className="btn batch-listen-btn speaking batch-listen-stop"
+          onClick={toggleListen}
+          title="Dừng đọc"
+        >
+          <Square size={16} />
+          <span>Dừng</span>
+        </button>
+      )}
+    </div>
+  );
+
   return (
     <Dialog
-      title="Xác nhận danh sách số"
+      title="Xác nhận số"
       fullscreen
       headerAction={
-        <button type="button" className="btn" onClick={onCancel}>
-          Hủy
-        </button>
+        listenControls ? (
+          <div className="dialog-fullscreen-header-actions">
+            {listenControls}
+          </div>
+        ) : undefined
       }
     >
       <form
@@ -286,72 +354,41 @@ export function ConfirmBatchDialog({
           )}
 
           <div className="dialog-footer dialog-footer-batch">
-            {listenAvailable && (
-              <div
-                className={`batch-listen-group${speaking ? " speaking" : ""}`}
-              >
-                {!speaking && (
-                  <>
-                    <button
-                      type="button"
-                      className="btn batch-listen-speed-btn"
-                      onClick={() => adjustListenSpeed(-PLAYBACK_RATE_STEP)}
-                      disabled={listenSpeed <= MIN_PLAYBACK_RATE + 1e-9}
-                      title="Giảm tốc độ đọc"
-                      aria-label="Giảm tốc độ đọc"
-                    >
-                      <Minus size={16} />
-                    </button>
-                    <button
-                      type="button"
-                      className="btn batch-listen-btn"
-                      onClick={toggleListen}
-                      disabled={numbers.every((n) => !n.trim())}
-                      title="Đọc lại danh sách số theo thứ tự (từng chữ số tiếng Việt)"
-                    >
-                      <Volume2 size={16} />
-                      <span className="batch-listen-speed-value">
-                        {listenSpeed.toFixed(2)}
-                      </span>
-                    </button>
-                    <button
-                      type="button"
-                      className="btn batch-listen-speed-btn"
-                      onClick={() => adjustListenSpeed(PLAYBACK_RATE_STEP)}
-                      disabled={listenSpeed >= MAX_PLAYBACK_RATE - 1e-9}
-                      title="Tăng tốc độ đọc"
-                      aria-label="Tăng tốc độ đọc"
-                    >
-                      <Plus size={16} />
-                    </button>
-                  </>
-                )}
-                {speaking && (
-                  <button
-                    type="button"
-                    className="btn batch-listen-btn speaking batch-listen-stop"
-                    onClick={toggleListen}
-                    title="Dừng đọc"
-                  >
-                    <Square size={16} />
-                    <span>Dừng</span>
-                  </button>
-                )}
-              </div>
-            )}
-            <div className="dialog-footer-batch-actions">
-              {showInsert && (
-                <button type="button" className="btn" onClick={submitInsert}>
-                  Chèn vào {insertAfterRowIndex! + 1}
-                </button>
-              )}
+            <div className="dialog-footer-batch-left">
               <button
                 type="button"
-                className="btn"
+                className="btn btn-icon"
+                onClick={onCancel}
+                title="Hủy"
+                aria-label="Hủy"
+              >
+                <X size={20} />
+              </button>
+              {showInsert && (
+                <button
+                  type="button"
+                  className="btn btn-icon"
+                  onClick={submitInsert}
+                  title={`Chèn vào dòng ${insertAfterRowIndex! + 1}`}
+                  aria-label={`Chèn vào dòng ${insertAfterRowIndex! + 1}`}
+                >
+                  <ArrowDownToLine size={18} />
+                  <span className="btn-icon-label">
+                    {insertAfterRowIndex! + 1}
+                  </span>
+                </button>
+              )}
+            </div>
+            <div className="dialog-footer-batch-actions">
+              <button
+                type="button"
+                className="btn btn-icon"
                 disabled={selectedIndex === null}
                 onClick={insertChipAfterSelected}
+                title="Chèn chip mới sau chip đang chọn"
+                aria-label="Chèn chip mới sau chip đang chọn"
               >
-                Chèn chip
+                <ListPlus size={18} />
               </button>
               <button type="submit" className="btn primary">
                 OK
@@ -373,9 +410,10 @@ export function ConfirmBatchDialog({
             <button
               type="button"
               className="btn batch-numpad-key"
-              onClick={backspaceInput}
-              title="Xóa một chữ số"
+              disabled={selectedIndex === null}
+              title="Xóa một chữ số (nhấn giữ để xóa liên tục)"
               aria-label="Xóa một chữ số"
+              {...backspaceHold}
             >
               <Delete size={20} />
             </button>

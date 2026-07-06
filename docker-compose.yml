@@ -13,6 +13,8 @@ services:
       interval: 3s
       timeout: 5s
       retries: 10
+    ports:
+      - "5530:5432"
 
   backend:
     build: ./backend
